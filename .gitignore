@@ -9,6 +9,5 @@ octave-workspace
 .DS_Store
 Thumbs.db
 
-# Published HTML is generated; uncomment to keep it out of version control.
-# examples/html/*.html
-# examples/html/*.png
+# Generated gallery output (regenerate with examples/publishDocs.m)
+examples/html/
