@@ -78,18 +78,14 @@ close all
 % two colours is a merge: two real calls collapsed into one event.
 
 %% Setup
-% Point MATLAB at the folder holding |multiCaptureHistoryClustered.m|, then
-% define the matcher handle and buffer that every rung uses. The matcher is
-% a handle so that a second algorithm (for example a gridded matcher) can be
-% dropped in later by changing this one line, mirroring the bsnr pattern of
-% one interface with several algorithms behind it. Edit |analysisRoot| to
-% match your installation.
+% The matcher lives in the repo root, one level up from this examples folder,
+% so we add that to the path relative to this file. The matcher is a handle,
+% so a second algorithm (a gridded matcher, say) can be dropped in later by
+% changing this one line, mirroring the bsnr pattern of one interface with
+% several algorithms behind it.
 
-analysisRoot = 'C:\analysis';
-matcherDir   = fullfile(analysisRoot, 'callDensitySupport');
-if exist(matcherDir, 'dir') && ~any(strcmp(strsplit(path, pathsep), matcherDir))
-    addpath(matcherDir);
-end
+here = fileparts(mfilename('fullpath'));
+addpath(fullfile(here, '..'), '-begin');
 
 timeBuffer = 3;    % seconds. Detections separated by more than this open a
                    % new event. In the real pipeline this is in days.

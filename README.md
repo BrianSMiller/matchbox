@@ -20,6 +20,19 @@ with imperfect boxes drawn around calls, this is the hard part. This toolbox
 provides matching algorithms behind a common interface, mirroring the
 `bsnr` pattern of one interface with several algorithms.
 
+## What sets this apart
+
+This is not generic detection matching. Pairwise schemes and
+intersection-over-union answer a two-way question: does this detection match
+that one. The premise here is different and is the whole point. Many
+observers, human analysts and automated detectors together, all disagree at
+once, and the job is to reconcile them into a single set of events in one
+pass, so that every event carries a consistent record of who detected it.
+That reconciliation must not depend on the order the observers are
+considered, and it must survive one observer lumping or splitting where
+another does not. A sequence of pairwise IoU matches gives neither. The
+algorithms here are built around the N-observer case from the start.
+
 ## Two applications, kept distinct
 
 1. **Detection functions for call density estimation** — how detection
