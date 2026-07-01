@@ -56,37 +56,49 @@ over several calls) has a downstream correction for density estimation (count
 calls per detection) but not for detector characterisation. The algorithms
 and the gallery keep the two straight.
 
-## Algorithms
+## Usage
 
-| function | approach | use when |
-|---|---|---|
-| `multiCaptureHistoryClustered` | temporal single-linkage clustering | calls well separated relative to cross-observer timing jitter (Z-calls, D-calls, SRW upcalls in sparse bouts) |
-| `multiCaptureHistoryGridded` | fixed reference grid *(planned)* | calls close-spaced, where event-equals-call breaks down (fin 20/40 Hz pulse trains, choruses) |
-| `legacy/multiCaptureHistoryPairwise` | pairwise outer-join *(deprecated)* | reproduction of pre-2026 results only; order dependent, do not use for new work |
-
-All share the same interface. Each input is one observer's detection table
-with columns `t0`, `tEnd`, `fLow`, `fHigh` (times in days). The output is one
-row per event, with `detect_observerK` flags and every observer's columns
-suffixed `_observerK`.
+`matchbox` is the front door. Pick a method and pass its tuning parameter.
 
 ```matlab
-ch = multiCaptureHistoryClustered(d1, d2, d3, 'timeBuffer', 5/86400);
+ch = matchbox(d1, d2, d3, 'method','clustered', 'timeBuffer', 5/86400);
+ch = matchbox(d1, d2, d3, 'method','gridded',   'gridStep', 60/86400);
 ```
 
-Run per call type: filter each input to a single classification first, since
+Each input is one observer's detection table with columns `t0`, `tEnd`,
+`fLow`, `fHigh` (times in days). The output is one row per event, with
+`detect_observerK` flags and every observer's columns suffixed `_observerK`.
+`method` defaults to `clustered`. `splitRule` (`overlap` or `snr`) and
+`verbose` are shared; `timeBuffer` and `gridStep` are method-specific and
+forwarded to the chosen implementation, which validates them.
+
+## Algorithms
+
+| method | approach | use when |
+|---|---|---|
+| `clustered` (default) | temporal single-linkage clustering | calls well separated relative to cross-observer timing jitter (Z-calls, D-calls, SRW upcalls in sparse bouts) |
+| `gridded` | fixed reference grid | calls close-spaced, where event-equals-call breaks down (fin 20/40 Hz pulse trains, choruses) |
+| *legacy pairwise* | pairwise outer-join *(deprecated)* | reproduction of pre-2026 results only; order dependent, do not use for new work |
+
+The implementations live in `multiCaptureHistoryClustered.m`,
+`multiCaptureHistoryGridded.m`, and `legacy/multiCaptureHistoryPairwise.m`.
+They can be called directly, but `matchbox` is the intended interface. Run
+per call type: filter each input to a single classification first, since
 matching uses time and a single frequency band.
 
 ## Layout
 
 ```
-multiCaptureHistoryClustered.m   current recommended matcher
+matchbox.m                       front door: matchbox(..., 'method', ...)
+multiCaptureHistoryClustered.m   clustered implementation
+multiCaptureHistoryGridded.m     gridded implementation
 legacy/                          deprecated pairwise matcher + primitive
 tests/                           fast invariant checks (testMatchboxSmoke)
 examples/
-  testCaptureHistoryGallery.m    illustrated validation ladder (publishable)
-  compareCaptureHistory_Casey2019.m   old-vs-new comparison on real data
-  publishDocs.m                  render the gallery to examples/html/
-  html/                          generated HTML
+  gallery.m                           illustrated validation ladder (publishable)
+  compareCaptureHistory_Casey2019.m   legacy-vs-current comparison on real data
+  publishDocs.m                       render the gallery to examples/html/
+  html/                               generated HTML
 TODO.md                          open items
 ```
 

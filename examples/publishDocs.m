@@ -1,6 +1,6 @@
 function publishDocs
 % publishDocs  Publish the matchbox example gallery to HTML.
-%   Renders examples/testCaptureHistoryGallery.m to examples/html/ so it can
+%   Renders examples/gallery.m to examples/html/ so it can
 %   be shared and viewed outside MATLAB. Run from anywhere:
 %       publishDocs
 %
@@ -21,10 +21,10 @@ opts = struct( ...
     'evalCode',      true, ...
     'showCode',      true, ...
     'maxWidth',      1000, ...
-    'maxHeight',     0, ...
+    'maxHeight',     [], ...
     'stylesheet',    '');
 
-gallery = fullfile(examplesDir, 'testCaptureHistoryGallery.m');
+gallery = fullfile(examplesDir, 'gallery.m');
 outFile = publish(gallery, opts);
 
 fprintf('Published:\n  %s\n', outFile);

@@ -1,7 +1,7 @@
 %% compareCaptureHistory_Casey2019.m
-% Functional comparison of the old pairwise capture-history builder
-% (multiCaptureHistory) against the new temporal-clustering builder
-% (multiCaptureHistoryClustered) on the Common Ground Casey2019 ABZ dataset.
+% Functional comparison of the legacy pairwise builder
+% (legacy/multiCaptureHistoryPairwise) against the current matcher
+% (matchbox, method 'clustered') on the Common Ground Casey2019 ABZ dataset.
 %
 % Five observers: three analysts (a1,a2,a3), Ishmael spectrogram
 % correlation (pg), and Koogu DNN (dnn). We build three combinations and
@@ -9,7 +9,13 @@
 % histograms, and duplicate-key structure.
 %
 % There is no ground truth here. This is a "does it run, and where does it
-% differ" check, not a correctness proof.
+% differ" check, not a correctness proof. The legacy path additionally needs
+% doTimespansOverlap and timespanOverlap from the original detection toolbox.
+
+%% ---- paths -----------------------------------------------------------
+here = fileparts(mfilename('fullpath'));
+addpath(fullfile(here, '..'), '-begin');            % matchbox + matchers
+addpath(fullfile(here, '..', 'legacy'), '-begin');  % legacy pairwise builder
 
 %% ---- config ----------------------------------------------------------
 siteCode       = 'Casey2019';
@@ -65,13 +71,13 @@ for t = 1:nCombo
     nObs(t)  = numel(obs);
 
     try
-        oldTabs{t} = multiCaptureHistory(obs{:});
+        oldTabs{t} = multiCaptureHistoryPairwise(obs{:});
     catch err
-        warning('old builder failed on %s: %s', combos{t,1}, err.message);
+        warning('legacy builder failed on %s: %s', combos{t,1}, err.message);
         oldTabs{t} = table();
     end
 
-    newTabs{t} = multiCaptureHistoryClustered(obs{:}, ...
+    newTabs{t} = matchbox(obs{:}, 'method','clustered', ...
                     'timeBuffer', timeBuffer, 'splitRule', splitRule);
 
     writetable(newTabs{t}, sprintf( ...

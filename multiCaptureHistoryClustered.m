@@ -46,6 +46,7 @@ function ch = multiCaptureHistoryClustered(varargin)
 %                    'snr'     keep the detection with the highest snr
 %                              (requires an 'snr' column; falls back to
 %                              'overlap' with a warning if absent).
+%   'verbose'    - Print a short summary (default true).
 %
 % NOTE Clustering uses time only. For a single call type this is sufficient
 % and matches the temporal-overlap matching used previously. For mixed call
@@ -71,9 +72,11 @@ p = inputParser;
 addParameter(p, 'timeBuffer', 0, @(x) isnumeric(x) && isscalar(x));
 addParameter(p, 'splitRule', 'overlap', ...
              @(x) any(strcmpi(x, {'overlap','snr'})));
+addParameter(p, 'verbose', true, @(x) islogical(x) || isnumeric(x));
 parse(p, nv{:});
 timeBuffer = p.Results.timeBuffer;
 splitRule  = lower(p.Results.splitRule);
+verbose    = logical(p.Results.verbose);
 
 required = {'t0','tEnd','fLow','fHigh'};
 
@@ -191,14 +194,16 @@ for k = 1:nObs
 end
 
 % ---- report ------------------------------------------------------------
-fprintf('multiCaptureHistoryClustered: %d pooled detections -> %d events\n', ...
-        nPool, nEvents);
-for k = 1:nObs
-    dc = sprintf('detect_observer%d', k);
-    fprintf('  observer %d: %d pooled, %d events detected\n', ...
-            k, sum(poolObs==k), sum(ch.(dc)));
+if verbose
+    fprintf('multiCaptureHistoryClustered: %d pooled detections -> %d events\n', ...
+            nPool, nEvents);
+    for k = 1:nObs
+        dc = sprintf('detect_observer%d', k);
+        fprintf('  observer %d: %d pooled, %d events detected\n', ...
+                k, sum(poolObs==k), sum(ch.(dc)));
+    end
+    fprintf('  observer-events with a collapsed splitter: %d\n', nSplitCollapsed);
 end
-fprintf('  observer-events with a collapsed splitter: %d\n', nSplitCollapsed);
 
 end
 

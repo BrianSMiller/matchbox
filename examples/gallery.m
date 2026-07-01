@@ -8,7 +8,7 @@
 %
 % *To publish to HTML:*
 %
-%   publish('testCaptureHistoryGallery.m')
+%   publish('gallery.m')
 %
 % B. Miller, AAD, 2026
 
@@ -89,7 +89,7 @@ addpath(fullfile(here, '..'), '-begin');
 
 timeBuffer = 3;    % seconds. Detections separated by more than this open a
                    % new event. In the real pipeline this is in days.
-matcher = @(tabs) multiCaptureHistoryClustered(tabs{:}, ...
+matcher = @(tabs) matchbox(tabs{:}, 'method','clustered', ...
              'timeBuffer', timeBuffer, 'splitRule', 'overlap', 'verbose', false);
 
 fprintf('Buffer = %g s | splitRule = overlap\n', timeBuffer);
@@ -109,6 +109,7 @@ ch  = matcher(tables);
 res = checkScenario(ch, truth);
 reportRung('0  perfect agreement', res);
 plotScenario(tables, ch, truth, 'Rung 0 — perfect agreement');
+
 
 %% Rung 1 — Partial detection
 % Real observers miss calls. Here three observers each detect a random 70%
@@ -269,28 +270,37 @@ p.pDetect = 0.8;
 [tables, truth] = genScenario(p);
 ch  = matcher(tables);
 ev  = computeEventIds(ch, truth.nObs);
-fprintf('\nRung 6  chorus  [demonstration]\n');
-fprintf('   true calls detected: %d | events at buffer 0: %d | merged events: %d (%.0f%%)\n', ...
-    numel(truth.detectedCalls), ev.nEvents, sum(ev.merged), 100*mean(ev.merged));
 
 % A buffer sweep, the miniature of the real Casey sweep: a healthy regime
 % plateaus, this one keeps falling.
 bufSecs = [0 1 2 3 5 8];
-nEv = arrayfun(@(b) height(multiCaptureHistoryClustered(tables{:}, ...
+nEv = arrayfun(@(b) height(matchbox(tables{:}, 'method','clustered', ...
         'timeBuffer', b, 'splitRule', 'overlap', 'verbose', false)), bufSecs);
-fprintf('   buffer sweep (s):    '); fprintf('%6g', bufSecs); fprintf('\n');
-fprintf('   events:              '); fprintf('%6g', nEv);      fprintf('\n');
 
 % Timeline: close-spaced calls bridging into shared events.
 plotScenario(tables, ch, truth, 'Rung 6 — chorus regime (calls bridge into shared events)');
-
+snapnow;
 % Buffer sweep: a healthy regime plateaus, this one keeps falling.
 figure('Units','pixels','Position',[50 50 700 300]);
 plot(bufSecs, nEv, '-o', 'LineWidth', 1.2); grid on
 xlabel('timeBuffer (s)'); ylabel('number of events');
 title('Rung 6 — no plateau: buffer cannot help', 'FontWeight','bold');
+fprintf('\nRung 6  chorus  [demonstration]\n');
+fprintf('   true calls detected: %d | events at buffer 0: %d | merged events: %d (%.0f%%)\n', ...
+    numel(truth.detectedCalls), ev.nEvents, sum(ev.merged), 100*mean(ev.merged));
 
-fprintf('\n=== gallery complete ===\n');
+fprintf('   buffer sweep (s):    '); fprintf('%6g', bufSecs); fprintf('\n');
+fprintf('   events:              '); fprintf('%6g', nEv);      fprintf('\n');
+snapnow;
+
+%%%
+%% gallery complete
+% The end
+disp('\n=== gallery complete ===\n');
+
+%%
+
+%% TODO: References
 
 %% Local helpers
 
@@ -539,15 +549,15 @@ end
 function reportRung(name, res)
 % REPORTRUNG  Narrated summary for an assertion rung. The [PASS] tag is the
 %   quiet validation; the sentences are the illustrative part.
-fprintf('\nRung %s   [%s]\n', name, tf(res.pass, 'PASS', 'FAIL'));
-fprintf('   %d true calls: %d detected by one or more observers, %d missed by all.\n', ...
-    res.nCallsTrue, res.nCallsExpected, res.nUnobserved);
+disp(sprintf('\nRung %s   [%s]\n', name, tf(res.pass, 'PASS', 'FAIL')));
+disp(sprintf('   %d true calls: %d detected by one or more observers, %d missed by all.\n', ...
+    res.nCallsTrue, res.nCallsExpected, res.nUnobserved));
 freqStr = strjoin(arrayfun(@(j) sprintf('%d obs: %d', j, res.captureFreq(j)), ...
     1:numel(res.captureFreq), 'uni', 0), '   ');
-fprintf('   recovered as %d events. Capture frequency   %s\n', res.nEvents, freqStr);
+disp(sprintf('   recovered as %d events. Capture frequency   %s\n', res.nEvents, freqStr));
 if res.nFPevents > 0 || res.nMerged > 0
-    fprintf('   false-positive events: %d   merged events: %d\n', ...
-        res.nFPevents, res.nMerged);
+    disp(sprintf('   false-positive events: %d   merged events: %d\n', ...
+        res.nFPevents, res.nMerged));
 end
 end
 

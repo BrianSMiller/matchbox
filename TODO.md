@@ -29,17 +29,25 @@ Things to try:
 
 ## Roadmap
 
-- [ ] Build `multiCaptureHistoryGridded` (fixed reference grid) behind the
-      same interface. Rung 6 of the gallery has a slot for its curve; the
-      gridded matcher should plateau where clustering does not.
-- [ ] Add the gridded curve to rung 6 and turn it into the head-to-head
-      comparison that motivates the family.
+- [x] Build `multiCaptureHistoryGridded` (fixed reference grid) behind the
+      same interface. Assigns detections to bins by midpoint; one event per
+      occupied bin; order independent and reproducible.
+- [x] Unified front door: `matchbox(d1,...,dN, 'method',
+      'clustered'|'gridded', ...)` dispatches to the implementations and
+      forwards method-specific params (`timeBuffer` / `gridStep`) plus the
+      shared ones (`splitRule`, `verbose`), with strict per-method parsers so
+      a wrong-method param errors rather than being silently ignored. The
+      `multiCaptureHistory*` names are now internal; dropping the `multi`
+      prefix is deferred since they are no longer user facing.
+- [ ] Add the gridded curve to rung 6 of the gallery and turn it into the
+      head-to-head comparison that motivates the family: clustered keeps
+      merging as the buffer grows, gridded holds steady per occupied bin.
 - [ ] Extend the ladder: call-type presets beyond `zcall`/`chorus`
       (D-call, fin 20 Hz, SRW upcall) so regimes read as named cases.
 - [ ] Anchor the Casey comparison against the adjudicated every-eighth
       subset from the manuscript (duplicate-free reference).
 - [ ] Decide the fate of the legacy pairwise path: keep for reproducibility
-      or archive once gridded lands.
+      or archive once gridded is proven in use.
 
 ## Protocol note (not code)
 
