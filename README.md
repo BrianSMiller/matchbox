@@ -1,7 +1,9 @@
 # matchbox
 
-Matching acoustic detections across observers into multi-observer capture
-histories.
+**CHAOS** — Capture History Across Observers of Sounds
+
+Matching acoustic detections from multiple observers of a single sensor into
+multi-observer capture histories.
 
 *Working name. Rename freely: the name appears only here and in
 `examples/publishDocs.m`.*
@@ -32,6 +34,13 @@ That reconciliation must not depend on the order the observers are
 considered, and it must survive one observer lumping or splitting where
 another does not. A sequence of pairwise IoU matches gives neither. The
 algorithms here are built around the N-observer case from the start.
+
+**Scope: one sensor, many observers.** Observers are different ways of
+detecting calls in the same recording, several analysts, one or more
+automated detectors, or both, disagreeing about the same single-hydrophone
+data. Matching detections across spatially separated sensors, where
+time-of-arrival differences and coherence matter (wide-baseline arrays), is a
+different problem and is out of scope.
 
 ## Two applications, kept distinct
 
