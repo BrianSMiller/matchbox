@@ -1,0 +1,14 @@
+# MATLAB
+*.asv
+*.autosave
+*.mex*
+slprj/
+octave-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Published HTML is generated; uncomment to keep it out of version control.
+# examples/html/*.html
+# examples/html/*.png
