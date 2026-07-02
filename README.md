@@ -5,22 +5,21 @@
 Matching acoustic detections from multiple observers of a single sensor into
 multi-observer capture histories.
 
-*Working name. Rename freely: the name appears only here and in
-`examples/publishDocs.m`.*
 
-## What this is
+## What is matchbox CHAOS?
 
-A **capture history** records, for one real event (here an acoustic call),
-which of several independent observers detected it. Observers are analysts
-and automated detectors. Each row is a call, each column is an observer, each
-entry says whether that observer detected that call. The idea comes from
-mark-recapture and double-observer survey methods.
+It's a detection matching tool that produces capture histories. For one real 
+event, (here an acoustic call) a **capture history** records which of several 
+independent observers detected it. Observers are analysts and automated 
+detectors. Each row is a call, each column is an observer, each entry says
+whether that observer detected that call. The idea comes from mark-recapture and
+double-observer survey methods.
 
-Building one requires **matching**: deciding when a detection from one
-observer is the same call as a detection from another. In continuous time,
-with imperfect boxes drawn around calls, this is the hard part. This toolbox
-provides matching algorithms behind a common interface, mirroring the
-`bsnr` pattern of one interface with several algorithms.
+Building a **capture history table** requires **matching**: deciding when a 
+detection from one observer is the same call as a detection from another. In 
+continuous time, with imperfect boxes drawn around calls, this is the hard part. 
+This toolbox provides matching algorithms behind a common interface, mirroring 
+the `bsnr` pattern of one interface with several algorithms.
 
 ## What sets this apart
 
@@ -35,9 +34,9 @@ considered, and it must survive one observer lumping or splitting where
 another does not. A sequence of pairwise IoU matches gives neither. The
 algorithms here are built around the N-observer case from the start.
 
-**Scope: one sensor, many observers.** Observers are different ways of
-detecting calls in the same recording, several analysts, one or more
-automated detectors, or both, disagreeing about the same single-hydrophone
+**Scope: one sensor, many observers.** Observers here means independent ways of
+detecting calls in the same recording: several analysts, one or more
+automated detectors, or both, observing the same single-hydrophone
 data. Matching detections across spatially separated sensors, where
 time-of-arrival differences and coherence matter (wide-baseline arrays), is a
 different problem and is out of scope.
@@ -115,7 +114,7 @@ publishDocs                       % render the gallery to html/
 
 The clustered matcher and the gallery are self-contained (base MATLAB). The
 legacy pairwise path additionally needs `doTimespansOverlap` and
-`timespanOverlap` from the original detection toolbox.
+`timespanOverlap` from the original annotatedLibrary or bsmUtils toolboxes.
 
 ## Citation
 
