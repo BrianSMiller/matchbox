@@ -19,7 +19,7 @@ addpath(fullfile(here, '..', 'legacy'), '-begin');  % legacy pairwise builder
 
 %% ---- config ----------------------------------------------------------
 siteCode       = 'Casey2019';
-folder         = 'detections';
+folder         = 'S:\manuscripts\2023-PerceptionBias_effects_on_CallDensities\detections';
 classification = 'BmAntABZ';
 timeBuffer     = 0;          % days. 0 = exact overlap. Try 5/86400 to test.
 splitRule      = 'overlap';  % 'overlap' or 'snr'
