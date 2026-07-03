@@ -36,22 +36,23 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       a wrong-method param errors rather than being silently ignored. The
       `multiCaptureHistory*` names are now internal; dropping the `multi`
       prefix is deferred since they are no longer user facing.
-- [x] Turn example 6 into a clustered-vs-gridded head-to-head. Both timelines
+- [x] Turn example 7 into a clustered-vs-gridded head-to-head. Both timelines
       and both parameter sweeps are shown. Framing is two methods answering
       two questions, not a contest: clustered searches for a per-call plateau
       the chorus does not contain (buffer sweep keeps falling); gridded reports
       per-bin presence at a resolution you choose (count varies smoothly with
       gridStep). A dashed "true calls detected" reference line anchors both
-      plots. The clustered sweep now extends into negative buffers: a negative
-      buffer requires overlap to link, fragments loose chains, and drives the
-      count up across the reference line. The example tunes the buffer to that
-      crossing and shows, from the synthetic truth, that the count can be right
-      while the capture history still holds merges and fragments. Event
-      duration versus known call duration is offered as the real-data proxy
-      for that check, since real data has no truth to measure against.
+      plots. The clustered sweep now extends into negative buffers (example 8):
+      a negative buffer requires overlap to link, fragments loose chains, and
+      drives the count up across the reference line. The example tunes the
+      buffer to that crossing and shows, from the synthetic truth, that the
+      count can be right while the capture history still holds merges and
+      fragments. Event duration versus known call duration is offered as the
+      real-data proxy for that check, since real data has no truth to measure
+      against.
 - [ ] Open question (Brian's finding): are negative timeBuffers ever a
       defensible matching choice on real data, or only a count-matching
-      artefact? Example 6 shows the count can land on target while the CHT is
+      artefact? Example 8 shows the count can land on target while the CHT is
       wrong. If a principled use exists, document it; otherwise add a caution
       to the clustered matcher's help against tuning by count alone.
 - [ ] Labelling convention to settle: the gallery calls a matched row an
@@ -61,7 +62,7 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       preferred, switch prose, printouts, and figure labels together.
 - [x] Drop the `matcher` function handle from the gallery. Every example now
       calls `matchbox` directly; clustered is left implicit (timeBuffer only)
-      except in example 6, which names both methods to compare them.
+      except in examples 7 and 8, which name both methods to compare them.
 - [x] Rename "rung" to "example" throughout the gallery (headers, prose, the
       reportRung printout). The ladder metaphor is kept in the intro. The
       helper is still named reportRung internally (not reader-facing).
@@ -72,10 +73,50 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       `plotCaptureHistory` (colour by event, show detect flags, no truth
       required) would give a point-check on real capture-history tables. Put
       it on the general path (repo root), not in examples/private.
-- [ ] Anchor the Casey comparison against the adjudicated every-eighth
-      subset from the manuscript (duplicate-free reference).
 - [ ] Decide the fate of the legacy pairwise path: keep for reproducibility
       or archive once gridded is proven in use.
+- [ ] Example 3 (order independence): current version only confirms the
+      clustered matcher is order-independent, which it does thinly by
+      reversing observer order on the example 2 scenario. The goal is also to
+      demonstrate that the legacy pairwise matcher is order-dependent, using a
+      synthetic scenario where the failure is legible and attributable.
+
+      The mechanism: pairwise matching processes observers sequentially,
+      matching each new table against a growing aggregate. When detections
+      are ambiguous -- due to timing jitter, splitting, or lumping -- the
+      max-overlap key assignment in captureHistoryTable.m produces a different
+      result depending on what is already in the aggregate, which depends on
+      observer order. The specific failure mode we discussed: a detection from
+      one observer that overlaps two detections in the aggregate (because of
+      jitter or a split) gets assigned to the wrong key depending on which
+      of those aggregate detections was anchored first.
+
+      A suitable scenario probably involves 3 observers, 2-3 real calls, and
+      enough timing jitter or splitting to create at least one ambiguous
+      overlap in the aggregate. The goal is four figures: clustered original
+      order, clustered reversed (visually identical), pairwise original,
+      pairwise reversed (visually different). The failure should be obvious
+      from the figures without needing the prose to explain it.
+
+      Approach: try genScenario with p.timeJitter large enough relative to
+      call spacing to produce overlapping adjacent boxes (without going full
+      chorus), and p.pSplit > 0 on one observer. Fix the RNG seed so the
+      failure is reproducible. Run both matchers on both orderings and inspect
+      the figures before committing. If genScenario cannot produce a reliable
+      failure with sensible parameters, construct the three observer tables
+      manually -- the scenario only needs a handful of rows and manual
+      construction makes the mechanism explicit.
+
+      The Casey 2019 real-data comparison (compareCaptureHistory_Casey2019.m)
+      is not included in the published gallery. It remains available as a
+      diagnostic script for developers. The gallery is entirely synthetic.
+
+- [ ] Capstone example: all pathologies combined. A single scenario with
+      jitter, splitting, lumping, and false positives together -- mirroring
+      the conditions of the Casey 2019 real data. Run all three matchers
+      (clustered, gridded, pairwise) and compare. This is the "why we built
+      this toolbox" example. Deferred until after the AWR manuscript is
+      further along.
 
 ## Protocol note (not code)
 

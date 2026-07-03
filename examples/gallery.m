@@ -27,12 +27,12 @@ close all
 % In passive acoustics this feeds two distinct jobs, and the distinction
 % matters throughout the gallery:
 %
-% 1. *Detection functions for call density estimation.* How detection
+% # *Detection functions for call density estimation.* How detection
 %    probability falls with range or signal-to-noise ratio, so a count of
 %    detections becomes a density of animals. This is the Common Ground
 %    protocol (Miller et al. 2026, Methods in Ecology and Evolution; the
 %    |callDensity| R package).
-% 2. *Detector characterisation.* How a detector performs against analysts
+% # *Detector characterisation.* How a detector performs against analysts
 %    or other detectors, in the usual precision and recall terms.
 %
 % Building a capture history requires *matching*: deciding when a detection
@@ -40,10 +40,10 @@ close all
 % continuous time, with imperfect boxes drawn around calls, this is the hard
 % part. Four things go wrong, and each has its own example below:
 %
-%   missed          an observer did not detect a call that was there
-%   false positive  a detection with no real call behind it
-%   splitting       one observer draws several boxes over a single call
-%   lumping         one observer draws a single box over several calls
+%  missed           an observer did not detect a call that was there
+%  false positive   a detection with no real call behind it
+%  splitting        one observer draws several boxes over a single call
+%  lumping          one observer draws a single box over several calls
 %
 % Missed detections and false positives are unavoidable and are exactly what
 % we want to measure. Splitting is a nuisance the matcher can undo, because
@@ -63,16 +63,17 @@ close all
 % Every example draws a timeline. Time runs left to right in seconds. There
 % is one row per observer.
 %
-%   coloured bar   a detection, from its start to its end time. The colour
+% 
+%  coloured bar    a detection, from its start to its end time. The colour
 %                  identifies the true call it belongs to, so bars of the
 %                  same colour are the same call seen by different observers.
-%   grey bar       a false positive: a detection that belongs to no call.
-%   thicker bar    a lumped box, one the generator drew over more than one
+%  grey bar        a false positive: a detection that belongs to no call.
+%  thicker bar     a lumped box, one the generator drew over more than one
 %                  call (appears in the lumping example).
-%   shaded band    a recovered event. Every bar inside one band was assigned
+%  shaded band     a recovered event. Every bar inside one band was assigned
 %                  to the same event by the matcher. Alternate events are
 %                  shaded so neighbours stay distinct.
-%   bottom tick    a true call centre, coloured to match its call. This is
+%  bottom tick     a true call centre, coloured to match its call. This is
 %                  the ground truth the matcher never sees. A tick with no
 %                  bars above it is a call every observer missed.
 %
@@ -113,7 +114,7 @@ plotScenario(tables, ch, truth, 'Example 0: perfect agreement');
 
 %% Example 1: Partial detection
 % Real observers miss calls. Here three observers each detect a random 70%
-% of calls, independently. The recovered detection matrix must reproduce the
+% of calls, independently. The recovered detection matrix should reproduce the
 % pattern of hits and misses exactly. This is the capture history doing its
 % actual job.
 %
@@ -137,15 +138,11 @@ res = checkScenario(ch, truth);
 reportRung('1  partial detection', res);
 plotScenario(tables, ch, truth, 'Example 1: partial detection');
 
-%% Example 2: Timing jitter and order independence
+%% Example 2: Timing jitter 
 % Observers rarely agree on a call's start to the second. Here their boxes
-% are offset by a few seconds. For well-separated calls this must change
-% nothing, because boxes of the same call still overlap. We also shuffle the
-% order the tables are passed in and confirm the event structure is
-% identical. That is the synthetic version of the 123-versus-321 test on the
-% real Casey data, where the old pairwise matcher gave different answers
-% depending on observer order and this one does not.
-
+% are offset (potentially by a few seconds on long calls). Ideally this
+% will not change the results because boxes of the same call still overlap. 
+% 
 p = defaults('zcall');
 p.nCalls = 24; p.nObs = 3;
 p.pDetect = 0.7; p.timeJitter = 3;      % seconds of start-time disagreement
@@ -154,24 +151,56 @@ p.pDetect = 0.7; p.timeJitter = 3;      % seconds of start-time disagreement
 ch  = matchbox(tables{:}, 'timeBuffer', timeBuffer, 'verbose', false);
 res = checkScenario(ch, truth);
 reportRung('2  timing jitter', res);
-
-% Order independence: match the same tables in a shuffled order and compare
-% the event structure, using the true-call content of each event (which does
-% not depend on which column an observer landed in).
-ord  = randperm(truth.nObs);
-chSh = matchbox(tables{ord}, 'timeBuffer', timeBuffer, 'verbose', false);
-ev1  = computeEventIds(ch,   truth.nObs);
-ev2  = computeEventIds(chSh, truth.nObs);
-same = ev1.nEvents == ev2.nEvents && isequal(ev1.sortedIds, ev2.sortedIds);
-fprintf('   order-independent: %s\n', tf(same, 'yes', 'NO'));
 plotScenario(tables, ch, truth, 'Example 2: timing jitter');
 
-%% Example 3: False positives
+%% Example 3: Order independence
+% The clustered matcher pools all detections before grouping, so the result
+% does not depend on which observer is passed first. Here we build the same
+% scenario with reversed observer order and confirm the event structure is
+% identical. This is the synthetic version of a test run on the real Casey
+% 2019 data, where the old pairwise matcher gave different answers depending
+% on observer order and this one does not.
+%
+% The legacy pairwise matcher is included for contrast. It matches
+% detections against a growing aggregate rather than a shared pool, so the
+% first observer's detections anchor the result and later observers are
+% matched against whatever was already accumulated. Reversing the order
+% changes the anchor and changes the answer. The comparison below shows
+% both matchers on both orderings: clustered is stable, pairwise is not.
+%
+% The legacy path additionally needs |doTimespansOverlap| and
+% |timespanOverlap| from the original toolbox.
+
+ord  = fliplr(1:p.nObs);   % reverse observer order
+
+% Clustered: original and reversed.
+ev1  = computeEventIds(ch,   truth.nObs);
+chSh = matchbox(tables{ord}, 'timeBuffer', timeBuffer, 'verbose', false);
+ev2  = computeEventIds(chSh, truth.nObs);
+clusterSame = ev1.nEvents == ev2.nEvents && isequal(ev1.sortedIds, ev2.sortedIds);
+
+% Pairwise: original and reversed.
+chP  = multiCaptureHistoryPairwise(tables{:});
+chPS = multiCaptureHistoryPairwise(tables{ord});
+evP1 = computeEventIds(chP,  truth.nObs);
+evP2 = computeEventIds(chPS, truth.nObs);
+pairSame = evP1.nEvents == evP2.nEvents && isequal(evP1.sortedIds, evP2.sortedIds);
+
+fprintf('\nExample 3  order independence\n');
+fprintf('   clustered: original %d events, reversed %d events, same: %s\n', ...
+    ev1.nEvents, ev2.nEvents, tf(clusterSame, 'yes', 'NO'));
+fprintf('   pairwise:  original %d events, reversed %d events, same: %s\n', ...
+    evP1.nEvents, evP2.nEvents, tf(pairSame, 'yes', 'NO'));
+
+plotScenario(tables, chSH,  truth, 'Example 3: clustered (reverse order)');
+plotScenario(tables, chPS, truth, 'Example 3: pairwise (reverse order)');
+
+%% Example 4: False positives
 % This is the case that dominates automated detection. Low-precision
-% detectors report many spurious detections, because there are many
-% low-SNR calls to be fooled by. Observer 3 here is such a detector. Its
-% false positives must form their own events and must never attach
-% themselves to a real call.
+% detectors report many spurious detections. Observer 3 here is such a 
+% detector. Ideally, the false positives will form their own events and not 
+% attach themselves to a real call, which would confound the capture 
+% history.
 
 p = defaults('zcall');
 p.nCalls = 24; p.nObs = 3;
@@ -181,10 +210,10 @@ p.nFP = [4 4 18];                       % observer 3 is low precision
 [tables, truth] = genScenario(p);
 ch  = matchbox(tables{:}, 'timeBuffer', timeBuffer, 'verbose', false);
 res = checkScenario(ch, truth);
-reportRung('3  false positives', res);
-plotScenario(tables, ch, truth, 'Example 3: false positives');
+reportRung('4  false positives', res);
+plotScenario(tables, ch, truth, 'Example 4: false positives');
 
-%% Example 4: Splitting
+%% Example 5: Splitting
 % Observer 3 now sometimes reports one call as two shorter boxes. Because
 % both boxes still overlap the same call, the matcher's same-observer
 % collapse folds them back to one row per event, and the event count and
@@ -202,13 +231,13 @@ res = checkScenario(ch, truth);
 reportRung('4  splitting', res);
 fprintf('   splits generated: %d | events still equal detected calls: %s\n', ...
     truth.nSplits, tf(res.nCallsRecovered == res.nCallsExpected, 'yes', 'NO'));
-plotScenario(tables, ch, truth, 'Example 4: splitting');
+plotScenario(tables, ch, truth, 'Example 5: splitting');
 
-%% Example 5: Lumping, and why it must be fixed upstream
+%% Example 6: Lumping, and why it must be fixed upstream
 % Observer 1 now sometimes draws one box over two adjacent calls. This is the
 % pathology we found in analyst a2 at Casey 2019. Unlike splitting it cannot
 % be undone, because the fact that the box held two calls was never recorded.
-% Lumping carries two costs, one for each application from the Background:
+% Lumping carries two costs:
 %
 % 1. *Detector characterisation.* The lumped box bridges two calls into one
 %    long event. The dependable signature is event duration, exactly as on
@@ -220,10 +249,14 @@ plotScenario(tables, ch, truth, 'Example 4: splitting');
 %    Their capture histories are quietly damaged. That lost-detection count
 %    is the real price of a missing "one box per call" instruction.
 %
-% The |nCalls| annotation the generator puts on the lumped box supports the
-% density correction (a true positive worth two calls) for that observer,
-% but it cannot restore what the co-observers lost. The fix belongs in the
-% annotation protocol, not in the matcher.
+% If the annotation generator can assign a number of calls, |nCalls| to
+% each annotation, then the lumped box can still be used for density
+% estimation with a correction (that true positive is worth two calls).
+% However, this correction cannot restore what the co-observers lost. So
+% this post-hoc correction does not fully rectify lumped  calls. Instead,
+% the fix belongs in the annotation protocol: ensure that observers
+% strictly adhere to a protocol of "one call per annotation" (i.e. NO
+% lumping).
 
 p = defaults('zcall');
 p.nCalls = 24; p.nObs = 3;
@@ -247,13 +280,13 @@ detCols      = ch.Properties.VariableNames(startsWith(ch.Properties.VariableName
 nDetectCells = sum(sum(ch{:, detCols} == 1));
 collapseLoss = nPooledReal - nDetectCells;
 
-fprintf('\nExample 5  lumping  [demonstration]\n');
+fprintf('\nExample 6:  lumping  [demonstration]\n');
 fprintf('   lumps generated: %d | long events (>%.0f s): %d  -> duration catches every lump: %s\n', ...
     truth.nLumps, longThresh, nLong, tf(nLong == truth.nLumps, 'yes', 'NO'));
 fprintf('   co-observer detections swallowed by lump-bridged events: %d\n', collapseLoss);
 plotScenario(tables, ch, truth, 'Example 5: lumping (long bridged events)');
 
-%% Example 6: Chorus regime, where event-per-call breaks down
+%% Example 7: Heavy overlap/chorus regime, where event-per-call breaks down
 % Everything so far assumed calls far enough apart to tell one from the next.
 % Now the calls are close-spaced, a chorus of several animals rather than one
 % caller. Every box is honest: no lumping and no splitting. But distinct
@@ -277,27 +310,13 @@ plotScenario(tables, ch, truth, 'Example 5: lumping (long bridged events)');
 % individual calls. It reports presence at a resolution you choose, the way an
 % occupancy analysis chooses a cell size. Its event count also depends on the
 % bin width, but that dependence is a choice of resolution, not a failed
-% search. Here the grid is 15 s, a little wider than the 14 s mean call
-% spacing.
-%
-% Clustered has a third knob worth knowing. A negative buffer requires two
-% detections to overlap by at least its magnitude before they link, so it
-% fragments loosely joined chains and drives the event count up, toward the
-% per-call number and past it. The clustered sweep below runs into negative
-% buffers, and somewhere among them the clustered count crosses the dashed
-% line and lands on the number of calls that were detected. That landing is a
-% trap. The right number of events is not the right set of calls. Because this
-% scenario is synthetic we can prove it: at that buffer the count is right
-% while the capture history still holds merged events and calls fragmented
-% across two events. On real data, where the truth is hidden, event duration
-% is the stand-in check. A clean event lasts about as long as one call, so
-% events far longer flag merges and far shorter flag fragments.
+% search. Here the grid is 15 s, a little wider than the mean call spacing.
 %
 % The dashed line on each sweep is the number of true calls at least one
 % observer detected, the event count a perfect matcher would return. Clustered
 % sits below it at every non-negative buffer and falls further as the buffer
-% grows. Gridded meets it only when the bin is tuned near the call rate, which
-% is exactly the information a chorus hides.
+% grows. Gridded meets it only when the bin width is tuned near the mean call
+% spacing, which is exactly the information a chorus hides.
 
 p = defaults('chorus');
 p.nCalls = 40; p.nObs = 3;
@@ -311,23 +330,24 @@ nDet = numel(truth.detectedCalls);      % distinct calls seen by someone
 chC = matchbox(tables{:}, 'method','clustered', 'timeBuffer', 0, 'verbose', false);
 evC = computeEventIds(chC, truth.nObs);
 
-% Gridded at a 15 s bin, a little wider than the 14 s mean call spacing.
+% Gridded at a bin a little wider than the mean call spacing.
 gridStep = 15;
 chG = matchbox(tables{:}, 'method','gridded', 'gridStep', gridStep, 'verbose', false);
 evG = computeEventIds(chG, truth.nObs);
 
-fprintf('\nExample 6  chorus  [head-to-head]\n');
+fprintf('\nExample 7  chorus  [head-to-head]\n');
 fprintf('   %d true calls detected by one or more observers.\n', nDet);
+fprintf('   true call spacing: mean %.1f s\n', mean(diff(truth.tCentre)));
 fprintf('   clustered, buffer 0 s : %3d events, %2.0f%% hold >1 call (unwanted merges)\n', ...
     evC.nEvents, 100*mean(evC.merged));
 fprintf('   gridded,   grid %2g s  : %3d events, %2.0f%% hold >1 call (bin coarser than call rate)\n', ...
     gridStep, evG.nEvents, 100*mean(evG.merged));
 
-% Sweeps. Clustered over timeBuffer (including negative buffers, which require
-% overlap to link), gridded over gridStep. Both counts move with their
-% parameter, but for different reasons: clustered is searching for a plateau
-% that is not there, gridded is being read at different resolutions.
-bufSecs  = [-6 -4 -3 -2 -1 0 1 2 3 5 8];
+% Sweeps. Clustered over non-negative timeBuffer values; gridded over gridStep.
+% Both counts move with their parameter, but for different reasons: clustered
+% is searching for a per-call plateau that does not exist here; gridded is
+% being read at different resolutions.
+bufSecs  = [0 1 2 3 5 8];
 nEvBuf   = arrayfun(@(b) height(matchbox(tables{:}, 'method','clustered', ...
     'timeBuffer', b, 'verbose', false)), bufSecs);
 
@@ -340,33 +360,10 @@ fprintf('   events              : '); fprintf('%6g', nEvBuf);   fprintf('\n');
 fprintf('   gridded grid (s)    : '); fprintf('%6g', gridSecs); fprintf('\n');
 fprintf('   events              : '); fprintf('%6g', nEvGrid);  fprintf('\n');
 
-% Count is not correctness. Tune the clustered buffer to the negative value
-% whose event count is closest to the number of calls detected (the dashed
-% line), then, because the truth is known here, measure what that capture
-% history actually got wrong. The count is right while merges and fragmented
-% calls remain. Duration is the same story a real dataset would show without
-% any truth to check against.
-negList  = bufSecs(bufSecs < 0);
-[~, im]  = min(abs(nEvBuf(bufSecs < 0) - nDet));
-bufMatch = negList(im);
-chMatch  = matchbox(tables{:}, 'method','clustered', 'timeBuffer', bufMatch, 'verbose', false);
-evM      = computeEventIds(chMatch, truth.nObs);
-
-realIds  = evM.realId(~isnan(evM.realId));           % true call behind each real event
-nFrag    = sum(arrayfun(@(c) sum(realIds == c) > 1, unique(realIds)));  % calls split across events
-nMerge   = sum(evM.merged);
-
-fprintf('   tuned clustered buffer %g s: %d events, against %d calls detected (count on target)\n', ...
-    bufMatch, height(chMatch), nDet);
-fprintf('   but the capture history is still wrong: %d merged events, %d fragmented calls\n', ...
-    nMerge, nFrag);
-fprintf('   duration check (real-data proxy): one call ~%g s | median event  clustered %.1f s  gridded %.1f s\n', ...
-    p.callDur, median(chMatch.tEnd - chMatch.t0), median(chG.tEnd - chG.t0));
-
 % Two timelines on the same data, drawn as separate figures so each publishes
 % under its own heading. Clustered bridges neighbours into shared bands;
 % gridded cuts the same detections into fixed bins.
-plotScenario(tables, chC, truth, 'Example 6: clustered matcher, buffer 0 s');
+plotScenario(tables, chC, truth, 'Example 7: clustered matcher, buffer 0 s');
 plotScenario(tables, chG, truth, sprintf('Example 6: gridded matcher, %g s bins', gridStep));
 
 % Two sweeps side by side. Left: clustered never plateaus. Right: gridded
@@ -385,6 +382,68 @@ plot(gridSecs, nEvGrid, '-o', 'LineWidth', 1.2); grid on
 yline(nDet, '--', 'true calls detected');
 xlabel('gridStep (s)'); ylabel('number of events');
 title('gridded: count set by chosen resolution', 'FontWeight','bold');
+
+%% Example 8: Negative buffers, and why count is not correctness
+% The clustered sweep in example 6 stopped at zero. Below zero, a negative
+% buffer requires two detections to *overlap* by at least its magnitude before
+% they link. This fragments loosely joined chains and drives the event count
+% upward, past the per-call number and potentially back toward the reference
+% line. That recovery is not necessarily correct, and can be a trap.
+%
+% Here we run the same chorus scenario and sweep into negative buffers.
+% Somewhere in that sweep the event count lands on the number of calls that
+% at least one observer detected. The count looks right. The capture history
+% is not: it still holds merged events and calls fragmented across two rows.
+% Because this scenario is synthetic we can prove it. We find the
+% best-matching negative buffer automatically, measure the remaining errors,
+% and compare event duration against the known call duration as the same check
+% a practitioner would run on real data where the truth is hidden.
+%
+% Neither this example nor example 6 ends with a method declared correct.
+% Clustered matching, at any buffer, cannot separate calls that overlap in
+% time. Gridded matching sidesteps that question: it reports which observers
+% were active in each bin, not which calls they heard. In real Southern Ocean
+% choruses, calls from different individuals overlap by arbitrary amounts.
+% The two algorithms here represent the current toolkit. Neither resolves the
+% general overlapping-call case, and that remains an open problem.
+
+% Reuse the same scenario from example 6.
+negBufSecs = [-8 -6 -4 -3 -2 -1 0];
+nEvNeg = arrayfun(@(b) height(matchbox(tables{:}, 'method','clustered', ...
+    'timeBuffer', b, 'verbose', false)), negBufSecs);
+
+fprintf('\nExample 8  negative buffers  [count vs correctness]\n');
+fprintf('   reference: %d calls detected by one or more observers.\n', nDet);
+fprintf('   clustered buffer (s): '); fprintf('%6g', negBufSecs); fprintf('\n');
+fprintf('   events              : '); fprintf('%6g', nEvNeg);    fprintf('\n');
+
+% Find the negative buffer whose count is closest to nDet.
+[~, im]  = min(abs(nEvNeg - nDet));
+bufMatch = negBufSecs(im);
+chMatch  = matchbox(tables{:}, 'method','clustered', 'timeBuffer', bufMatch, 'verbose', false);
+evM      = computeEventIds(chMatch, truth.nObs);
+
+realIds = evM.realId(~isnan(evM.realId));
+nFrag   = sum(arrayfun(@(c) sum(realIds == c) > 1, unique(realIds)));
+nMerge  = sum(evM.merged);
+
+fprintf('   best-matching buffer %g s: %d events vs %d calls detected\n', ...
+    bufMatch, height(chMatch), nDet);
+fprintf('   merged events: %d | fragmented calls: %d\n', nMerge, nFrag);
+fprintf('   duration check: one call ~%g s | median event at tuned buffer %.1f s\n', ...
+    p.callDur, median(chMatch.tEnd - chMatch.t0));
+
+% Sweep figure: negative buffers drive the count up, cross the reference, and
+% keep climbing. The crossing is not a solution.
+figure('Units','pixels','Position',[50 50 560 320]);
+plot(negBufSecs, nEvNeg, '-o', 'LineWidth', 1.2); grid on
+yline(nDet, '--', 'true calls detected');
+xlabel('timeBuffer (s)'); ylabel('number of events');
+title('negative buffers: count crosses reference, history does not', 'FontWeight','bold');
+
+% Timeline at the tuned buffer, alongside the gridded result for comparison.
+plotScenario(tables, chMatch, truth, sprintf('Example 8: clustered, buffer %g s (count-matched)', bufMatch));
+plotScenario(tables, chG,     truth, sprintf('Example 8: gridded, %g s bins (same data)', gridStep));
 
 fprintf('\n=== gallery complete ===\n');
 
