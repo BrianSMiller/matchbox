@@ -50,7 +50,7 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       fragments. Event duration versus known call duration is offered as the
       real-data proxy for that check, since real data has no truth to measure
       against.
-- [ ] Open question (Brian's finding): are negative timeBuffers ever a
+- [x] Open question (Brian's finding): are negative timeBuffers ever a
       defensible matching choice on real data, or only a count-matching
       artefact? Example 8 shows the count can land on target while the CHT is
       wrong. If a principled use exists, document it; otherwise add a caution
@@ -75,7 +75,7 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       it on the general path (repo root), not in examples/private.
 - [ ] Decide the fate of the legacy pairwise path: keep for reproducibility
       or archive once gridded is proven in use.
-- [ ] Example 3 (order independence): current version only confirms the
+- [x] Example 3 (order independence): current version only confirms the
       clustered matcher is order-independent, which it does thinly by
       reversing observer order on the example 2 scenario. The goal is also to
       demonstrate that the legacy pairwise matcher is order-dependent, using a

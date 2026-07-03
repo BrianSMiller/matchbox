@@ -153,48 +153,78 @@ res = checkScenario(ch, truth);
 reportRung('2  timing jitter', res);
 plotScenario(tables, ch, truth, 'Example 2: timing jitter');
 
-%% Example 3: Order independence
-% The clustered matcher pools all detections before grouping, so the result
-% does not depend on which observer is passed first. Here we build the same
-% scenario with reversed observer order and confirm the event structure is
-% identical. This is the synthetic version of a test run on the real Casey
-% 2019 data, where the old pairwise matcher gave different answers depending
-% on observer order and this one does not.
+%% Example 3: Order dependence of the legacy pairwise matcher
+% Two calls, call A near 20 s and call B near 40 s, sit twelve seconds apart.
+% Nothing links them except one lumped box: observer 3 drew a single
+% annotation over both, the a2 pathology from Casey 2019. That box overlaps
+% observer 1's box on A and observer 2's box on B, so it bridges them.
 %
-% The legacy pairwise matcher is included for contrast. It matches
-% detections against a growing aggregate rather than a shared pool, so the
-% first observer's detections anchor the result and later observers are
-% matched against whatever was already accumulated. Reversing the order
-% changes the anchor and changes the answer. The comparison below shows
-% both matchers on both orderings: clustered is stable, pairwise is not.
+% The clustered matcher pools every detection, sorts by time, and cuts on
+% gaps. The bridge chains A to B into one event, and because pooling ignores
+% who contributed what, it returns that same one event whichever observer is
+% passed first. It is stable.
 %
-% The legacy path additionally needs |doTimespansOverlap| and
-% |timespanOverlap| from the original toolbox.
+% The legacy pairwise matcher builds a growing aggregate and matches each new
+% observer against it. Order now decides the answer. Passed 1, 2, 3, the two
+% calls seed separate events and the bridge, arriving last, attaches to the
+% one it overlaps more, leaving two events. Passed 3, 2, 1, the bridge seeds
+% the aggregate first, then A and B both merge onto it, leaving one. Same
+% detections, same boxes, two different capture histories.
+%
+% Four figures follow. The two clustered timelines are identical. The two
+% pairwise timelines differ, and the difference is visible without reading the
+% prose: forward keeps B separate, reversed swallows it. The legacy path also
+% needs doTimespansOverlap and timespanOverlap from the original toolbox.
 
-ord  = fliplr(1:p.nObs);   % reverse observer order
+vn = {'t0','tEnd','fLow','fHigh','snr','trueCall','nCalls'};
+band = [15 28];
+tables = { ...
+    table(16, 24, band(1), band(2), 10, 1, 1, 'VariableNames', vn), ... % obs1: call A
+    table(36, 44, band(1), band(2), 10, 2, 1, 'VariableNames', vn), ... % obs2: call B
+    table(18, 41, band(1), band(2),  8, 1, 2, 'VariableNames', vn) };   % obs3: lump A+B
 
-% Clustered: original and reversed.
-ev1  = computeEventIds(ch,   truth.nObs);
-chSh = matchbox(tables{ord}, 'timeBuffer', timeBuffer, 'verbose', false);
-ev2  = computeEventIds(chSh, truth.nObs);
-clusterSame = ev1.nEvents == ev2.nEvents && isequal(ev1.sortedIds, ev2.sortedIds);
+% Ground truth for this hand-built scenario, in the same shape genScenario
+% returns. Observer 3's lump means it detected both A and B, so both columns
+% of its row in D are true.
+truth = struct();
+truth.D             = logical([1 0 1; 0 1 1]);   % rows = calls, cols = observers
+truth.tCentre       = [20; 40];
+truth.nCalls        = 2;
+truth.nObs          = 3;
+truth.detectedCalls = find(any(truth.D, 2));
+truth.nSplits       = 0;
+truth.nLumps        = 1;
+
+ord = fliplr(1:truth.nObs);            % reversed observer order
+
+% Clustered: original and reversed. sortedIds is compared, not the raw table,
+% because reversing observers permutes the detect_observer columns while
+% leaving the event structure untouched.
+chC1 = matchbox(tables{:},   'timeBuffer', timeBuffer, 'verbose', false);
+chC2 = matchbox(tables{ord}, 'timeBuffer', timeBuffer, 'verbose', false);
+evC1 = computeEventIds(chC1, truth.nObs);
+evC2 = computeEventIds(chC2, truth.nObs);
+clusterSame = evC1.nEvents == evC2.nEvents && isequal(evC1.sortedIds, evC2.sortedIds);
 
 % Pairwise: original and reversed.
-chP  = multiCaptureHistoryPairwise(tables{:});
-chPS = multiCaptureHistoryPairwise(tables{ord});
-evP1 = computeEventIds(chP,  truth.nObs);
-evP2 = computeEventIds(chPS, truth.nObs);
+chP1 = multiCaptureHistoryPairwise(tables{:});
+chP2 = multiCaptureHistoryPairwise(tables{ord});
+evP1 = computeEventIds(chP1, truth.nObs);
+evP2 = computeEventIds(chP2, truth.nObs);
 pairSame = evP1.nEvents == evP2.nEvents && isequal(evP1.sortedIds, evP2.sortedIds);
 
-fprintf('\nExample 3  order independence\n');
-fprintf('   clustered: original %d events, reversed %d events, same: %s\n', ...
-    ev1.nEvents, ev2.nEvents, tf(clusterSame, 'yes', 'NO'));
-fprintf('   pairwise:  original %d events, reversed %d events, same: %s\n', ...
+fprintf('\nExample 3  order dependence\n');
+fprintf('   clustered: %d events forward, %d reversed  -> stable: %s\n', ...
+    evC1.nEvents, evC2.nEvents, tf(clusterSame, 'yes', 'NO'));
+fprintf('   pairwise:  %d events forward, %d reversed  -> stable: %s\n', ...
     evP1.nEvents, evP2.nEvents, tf(pairSame, 'yes', 'NO'));
+fprintf('   demonstration valid (clustered stable, pairwise not): %s\n', ...
+    tf(clusterSame && ~pairSame, 'yes', 'NO'));
 
-plotScenario(tables, chSH,  truth, 'Example 3: clustered (reverse order)');
-plotScenario(tables, chPS, truth, 'Example 3: pairwise (reverse order)');
-
+plotScenario(tables, chC1, truth, 'Example 3: clustered, forward order');
+plotScenario(tables, chC2, truth, 'Example 3: clustered, reversed order (identical)');
+plotScenario(tables, chP1, truth, 'Example 3: pairwise, forward order');
+plotScenario(tables, chP2, truth, 'Example 3: pairwise, reversed order (differs)');
 %% Example 4: False positives
 % This is the case that dominates automated detection. Low-precision
 % detectors report many spurious detections. Observer 3 here is such a 
@@ -284,7 +314,7 @@ fprintf('\nExample 6:  lumping  [demonstration]\n');
 fprintf('   lumps generated: %d | long events (>%.0f s): %d  -> duration catches every lump: %s\n', ...
     truth.nLumps, longThresh, nLong, tf(nLong == truth.nLumps, 'yes', 'NO'));
 fprintf('   co-observer detections swallowed by lump-bridged events: %d\n', collapseLoss);
-plotScenario(tables, ch, truth, 'Example 5: lumping (long bridged events)');
+plotScenario(tables, ch, truth, 'Example 6: lumping (long bridged events)');
 
 %% Example 7: Heavy overlap/chorus regime, where event-per-call breaks down
 % Everything so far assumed calls far enough apart to tell one from the next.
@@ -364,7 +394,7 @@ fprintf('   events              : '); fprintf('%6g', nEvGrid);  fprintf('\n');
 % under its own heading. Clustered bridges neighbours into shared bands;
 % gridded cuts the same detections into fixed bins.
 plotScenario(tables, chC, truth, 'Example 7: clustered matcher, buffer 0 s');
-plotScenario(tables, chG, truth, sprintf('Example 6: gridded matcher, %g s bins', gridStep));
+plotScenario(tables, chG, truth, sprintf('Example 7: gridded matcher, %g s bins', gridStep));
 
 % Two sweeps side by side. Left: clustered never plateaus. Right: gridded
 % varies smoothly with the bin width you choose.
@@ -384,7 +414,7 @@ xlabel('gridStep (s)'); ylabel('number of events');
 title('gridded: count set by chosen resolution', 'FontWeight','bold');
 
 %% Example 8: Negative buffers, and why count is not correctness
-% The clustered sweep in example 6 stopped at zero. Below zero, a negative
+% The clustered sweep in example 7 stopped at zero. Below zero, a negative
 % buffer requires two detections to *overlap* by at least its magnitude before
 % they link. This fragments loosely joined chains and drives the event count
 % upward, past the per-call number and potentially back toward the reference
@@ -399,7 +429,7 @@ title('gridded: count set by chosen resolution', 'FontWeight','bold');
 % and compare event duration against the known call duration as the same check
 % a practitioner would run on real data where the truth is hidden.
 %
-% Neither this example nor example 6 ends with a method declared correct.
+% Neither this example nor example 7 ends with a method declared correct.
 % Clustered matching, at any buffer, cannot separate calls that overlap in
 % time. Gridded matching sidesteps that question: it reports which observers
 % were active in each bin, not which calls they heard. In real Southern Ocean
@@ -407,7 +437,7 @@ title('gridded: count set by chosen resolution', 'FontWeight','bold');
 % The two algorithms here represent the current toolkit. Neither resolves the
 % general overlapping-call case, and that remains an open problem.
 
-% Reuse the same scenario from example 6.
+% Reuse the same scenario from example 7.
 negBufSecs = [-8 -6 -4 -3 -2 -1 0];
 nEvNeg = arrayfun(@(b) height(matchbox(tables{:}, 'method','clustered', ...
     'timeBuffer', b, 'verbose', false)), negBufSecs);
