@@ -1,14 +1,18 @@
-function [cap] = captureHistoryTable(table1, table2, varargin )
-% captureHistoryTable  LEGACY two-table capture-history primitive.
+function [cap] = pairwiseCaptureHistory(table1, table2, varargin)
+% pairwiseCaptureHistory  Two-table capture-history primitive.
 %
-% ============================ WARNING ============================
-% DEPRECATED. This is the pairwise primitive used by the legacy
-% multiCaptureHistoryPairwise. It has a known bug in its candidate-overlap
-% loop (the loop iterates once over a column vector rather than element by
-% element, and the overlap accumulators are not cleared between rows), so
-% matches involving more than one candidate are unreliable. Kept only for
-% reproducibility. Prefer multiCaptureHistoryClustered.
-% =================================================================
+% Promoted from matchbox/legacy/captureHistoryTable.m -- two-detector
+% setups are common enough (and match legacy behaviour) that this is a
+% supported, first-class option, not a discouraged one. It is
+% methodologically different from multiCaptureHistoryClustered/Gridded,
+% not wrong: see multiCaptureHistoryPairwise.m for the known
+% order-dependence caveat that comes with matching pairwise against a
+% growing aggregate. That tradeoff is inherent to the pairwise approach
+% and is NOT fixed by this file -- only a distinct loop/accumulator bug
+% in the overlap computation below has been fixed (previously caused
+% unreliable results whenever a detection had more than one candidate
+% overlap -- see git history for captureHistoryTable.m for the original
+% buggy version and full diagnosis).
 %
 % Create a Capture History Table, CAP, from two tables of detections,
 % table1 & table2. Rows in the capture history table represent detections,
@@ -52,32 +56,38 @@ for j = 1:height(table2)
     s1 = start1(j); e1 = end1(j);
 
     overlapIx = find(doTimespansOverlap(s1, e1, start2, end2, timeBuffer));
-    overlap = 0;
-    otherMatches = 0;
 
-    for i = overlapIx; 1:height(table1);
-        if isempty(i)
-            continue;
-        end
+    % Explicit per-candidate loop with local scalars -- fixes two bugs in
+    % the original: (1) `for i = overlapIx` iterated once over the WHOLE
+    % column vector rather than once per candidate, so `if tOverlap(i)>0`
+    % implicitly meant all() across candidates, wrongly skipping
+    % frequency overlap for genuine matches whenever any co-candidate had
+    % non-positive time overlap; (2) `tOverlap = tOverlap*86400` rescaled
+    % the entire accumulator array with no reset between outer j
+    % iterations, compounding across rows. Local scalars here can't have
+    % either problem -- freshly computed and discarded every inner
+    % iteration.
+    overlapAmount = zeros(size(overlapIx));
+    for ii = 1:numel(overlapIx)
+        i = overlapIx(ii);
         s2 = start2(i); e2 = end2(i);
 
-       tOverlap(i) = timespanOverlap(s1, e1, s2, e2); % Time overplap (days)
-
-       fOverlap(i) = 0;
-       if tOverlap(i) > 0
-           tOverlap = tOverlap * 86400; % Convert to s;
-           l1 = lowFreq1(j); u1 = hiFreq1(j);
-           l2 = lowFreq2(i); u2 = hiFreq2(i);
-           fOverlap(i) = timespanOverlap(l1,u1,l2,u2); % Frequency overlap (Hz)
-           overlap(i) = tOverlap(i) .* fOverlap(i);
-       end
+        tOv = timespanOverlap(s1, e1, s2, e2) * 86400; % days -> seconds
+        if tOv > 0
+            l1 = lowFreq1(j); u1 = hiFreq1(j);
+            l2 = lowFreq2(i); u2 = hiFreq2(i);
+            fOv = timespanOverlap(l1, u1, l2, u2); % Frequency overlap (Hz)
+            overlapAmount(ii) = tOv * fOv;
+        end
     end
 
+    overlap = 0;
     ix = 1;
-    if length(overlap) >= 1
-        [overlap, ix] = max(overlap);
-        otherMatches = find(ix==table2.key);
+    if any(overlapAmount > 0)
+        [overlap, bestIx] = max(overlapAmount);
+        ix = overlapIx(bestIx);
     end
+    otherMatches = find(ix==table2.key); %#ok<NASGU> % kept for parity with original; unused downstream there too
     table2.overlap(j) = overlap;
 
     if overlap > 0 % Match, so add this to an existing row
