@@ -514,6 +514,20 @@ plotScenario(tables, chG,     truth, sprintf('Example 8: gridded, %g s bins (sam
 % your data -- and this is exactly why pointProximity exists as its own
 % method rather than a variant flag on clustered: the two are answering
 % different questions, the same way clustered and gridded do in example 7.
+%
+% This example is deliberately table-only, no timeline figure. The shared
+% timeline plot used everywhere else shades events by alternating index,
+% purely for visual separation, not as a merge indicator -- and the very
+% first chronological event (which is what the merge is, here, since
+% observer 2's box starts at t=0) can never land on a shaded index. Worse,
+% pointProximity can legitimately produce two SEPARATE events with
+% overlapping time envelopes, something clustered/gridded structurally
+% cannot, and the shared plot draws each event's shaded region
+% independently, so overlapping envelopes visually blend into what looks
+% like one merged band whether or not they actually are. Rather than
+% fight a visualisation built for an assumption pointProximity doesn't
+% satisfy, the table below reads the actual key matchbox assigned to each
+% detection directly -- the real answer, not an inference from shading.
 
 vn = {'t0','tEnd','fLow','fHigh','snr','trueCall','nCalls'};
 band = [26 28];
@@ -522,30 +536,37 @@ tables = { ...
           10*ones(3,1), [1;2;3], ones(3,1), 'VariableNames', vn), ...  % obs1: precise A, B, C
     table(0, 50, band(1), band(2), 6, 1, 1, 'VariableNames', vn) };    % obs2: one wide box, truly only A
 
-truth = struct();
-truth.D             = logical([1 1; 1 0; 1 0]);   % call A: both; B, C: obs1 only
-truth.tCentre       = [16; 106; 206];
-truth.nCalls        = 3;
-truth.nObs          = 2;
-truth.detectedCalls = find(any(truth.D, 2));
-truth.nSplits       = 0;
-truth.nLumps        = 0;   % obs2's box is imprecise, not lumped -- it only ever touches call A
-
 chC  = matchbox(tables{:}, 'method','clustered',     'timeBuffer', timeBuffer, 'verbose', false);
 chPP = matchbox(tables{:}, 'method','pointProximity', 'timeBuffer', timeBuffer, 'verbose', false);
 
 fprintf('\nExample 9  point vs interval  [method comparison]\n');
 fprintf('   observer 2''s box: [0, 50] s | call A: [10, 22] s | gap between start times: 10 s | buffer: %g s\n', ...
     timeBuffer);
-fprintf('   clustered      : %d events (interval overlap credits the wide box to call A)\n', height(chC));
-fprintf('   pointProximity : %d events (start-time distance does not; the wide box opens its own event)\n', ...
-    height(chPP));
+fprintf('   clustered      : %d events\n', height(chC));
+fprintf('   pointProximity : %d events\n', height(chPP));
 
-plotScenario(tables, chC,  truth, 'Example 9: clustered (wide box credited to call A)');
-plotScenario(tables, chPP, truth, 'Example 9: pointProximity (wide box is its own event)');
+% Event key assigned to each detection, read directly from matchbox's own
+% output -- not a description of a figure, the actual answer.
+detections = { ...
+    'obs1 call A (t0=10)',  1, 10
+    'obs1 call B (t0=100)', 1, 100
+    'obs1 call C (t0=200)', 1, 200
+    'obs2 wide box (t0=0)', 2, 0  };
+
+fprintf('\n   %-24s %12s %14s\n', 'detection', 'clustered key', 'pointProx key');
+for i = 1:size(detections, 1)
+    label  = detections{i,1};
+    obsIdx = detections{i,2};
+    t0val  = detections{i,3};
+    colC  = sprintf('t0_observer%d', obsIdx);
+    kC  = chC.key( abs(chC.(colC)  - t0val) < 1e-9);
+    kPP = chPP.key(abs(chPP.(colC) - t0val) < 1e-9);
+    fprintf('   %-24s %12d %14d\n', label, kC, kPP);
+end
+fprintf(['   -> clustered: obs2''s wide box shares a key with call A (merged).\n' ...
+         '   -> pointProximity: obs2''s wide box has its own key, distinct from call A.\n']);
 
 fprintf('\n=== gallery complete ===\n');
-
 
 % Helper functions (scenario generation, checking, plotting) live in
 % examples/private/ so this file stays a pure script, which publishes cleanly.
