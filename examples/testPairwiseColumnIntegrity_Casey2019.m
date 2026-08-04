@@ -13,8 +13,21 @@ function testPairwiseColumnIntegrity_Casey2019
 % either -- wrong "missing" sentinel for a column type, or a collapsed
 % duplicate match leaving a winner row with blank data despite a true
 % detect flag -- would show up as detect_observerK disagreeing with
-% whether <col>_observerK is missing. This checks that agreement directly,
-% on the real Casey2019 tables, so real column types get exercised.
+% whether <col>_observerK is missing.
+%
+% Only ONE direction of that agreement is a genuine invariant: not
+% detected implies missing. The reverse -- detected implies not missing --
+% only holds if the column is fully populated in the observer's OWN
+% source table. Some detector output carries optional, sometimes-blank
+% metadata fields even for genuine detections (a Koogu run surfaced
+% SequenceBitmap/detectionType/bearingAmbiguity as already-sparse in the
+% raw table -- PAMGuard-style bearing/sequence fields a DNN detector
+% doesn't populate). Asserting the reverse direction there would be
+% checking the wrong thing: real source sparsity, not a matchbox bug. So
+% each column is checked against the stronger bidirectional invariant only
+% if its source table has no missing values of its own; otherwise only the
+% one-directional invariant is checked, and that narrower scope is
+% reported alongside the result rather than silently assumed.
 %
 % Not included in testMatchboxSmoke.m because it needs the real Casey2019
 % files (S:\...), same as compareCaptureHistory_Casey2019.m and
@@ -38,10 +51,8 @@ dnnCsv = fullfile(folder, 'subset_Casey2019_Koogu_DNN_090_events.csv');
 pg  = readtable(pgCsv);
 dnn = readtable(dnnCsv, 'Delimiter', ',');
 
-% Five observers: the worst case in the repo for exercising both new-event
-% blankify (dnn/pg open plenty of events analysts 1-3 never sees) and
-% duplicate-match collapse (analysts vs pg/dnn showed 13-1678 collapsed
-% groups per observer in compareCaptureHistory_Casey2019).
+% Same five-observer combination as compareCaptureHistory_Casey2019.m and
+% pairwiseOrderDependence_Casey2019.m.
 tables = {a1, a2, a3, pg, dnn};
 nObs   = numel(tables);
 required = {'t0','tEnd','fLow','fHigh'};
@@ -51,6 +62,7 @@ ch = multiCaptureHistoryPairwise(tables{:}, 'verbose', false);
 pass = true;
 nChecked = 0;
 nSkippedLogical = 0;
+nSourceSparse = 0;
 
 for k = 1:nObs
     dc = sprintf('detect_observer%d', k);
@@ -75,16 +87,31 @@ for k = 1:nObs
             continue;
         end
 
-        isMiss = ismissing(ch.(col));
-        agree  = isequal(isMiss, ~ch.(dc));
+        isMiss   = ismissing(ch.(col));
+        detected = ch.(dc);
+        notDetectedAreMissing = all(isMiss(~detected));
         nChecked = nChecked + 1;
-        pass = check(pass, agree, ...
-            sprintf('observer %d: %s missingness matches detect flag', k, baseName));
+
+        if any(ismissing(tables{k}.(baseName)))
+            % Source column already carries genuine missing values (an
+            % optional detector field), so a detected row is still
+            % allowed to be missing. Only the one-directional invariant
+            % is meaningful here.
+            nSourceSparse = nSourceSparse + 1;
+            pass = check(pass, notDetectedAreMissing, ...
+                sprintf('observer %d: %s (source has missing values; not-detected->missing only)', k, baseName));
+        else
+            detectedAreNotMissing = all(~isMiss(detected));
+            agree = notDetectedAreMissing && detectedAreNotMissing;
+            pass = check(pass, agree, ...
+                sprintf('observer %d: %s missingness matches detect flag', k, baseName));
+        end
     end
 end
 
-fprintf('\n%d column(s) checked across %d observers (%d logical column(s) skipped, not checkable)\n', ...
-    nChecked, nObs, nSkippedLogical);
+fprintf(['\n%d column(s) checked across %d observers (%d logical column(s) skipped, ' ...
+         'not checkable; %d checked one-directionally, source already sparse)\n'], ...
+    nChecked, nObs, nSkippedLogical, nSourceSparse);
 fprintf('testPairwiseColumnIntegrity_Casey2019: %s\n', ternary(pass, 'ALL PASS', 'FAILURES ABOVE'));
 end
 
