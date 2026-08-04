@@ -55,9 +55,11 @@ close all
 % time, and a single forward pass groups them into events, opening a new
 % event whenever a gap larger than |timeBuffer| appears. It is order
 % independent and needs no pairwise joins. Its strengths and its one clear
-% failure mode both appear below. The final example introduces a second
-% algorithm, a *gridded* matcher, at the point where clustering runs out of
-% road.
+% failure mode both appear below. Example 7 introduces a second algorithm,
+% a *gridded* matcher, at the point where clustering runs out of road. The
+% final example introduces a third, *pointProximity*, which links on a
+% single reference point rather than interval overlap -- a different
+% question again, not a better answer to the same one.
 
 %% Reading the figures
 % Every example draws a timeline. Time runs left to right in seconds. There
@@ -478,7 +480,72 @@ title('negative buffers: count crosses reference, history does not', 'FontWeight
 plotScenario(tables, chMatch, truth, sprintf('Example 8: clustered, buffer %g s (count-matched)', bufMatch));
 plotScenario(tables, chG,     truth, sprintf('Example 8: gridded, %g s bins (same data)', gridStep));
 
+%% Example 9: One point vs two -- clustered and pointProximity disagree
+% Everything above used the clustered matcher (or, in example 7-8,
+% clustered vs gridded). matchbox has a fourth method, pointProximity,
+% which links detections by a single reference point (default the start
+% time) within timeBuffer of each other, rather than by interval overlap.
+% One endpoint compared, not two -- that's the whole difference from
+% clustered, and it has a real consequence for imprecise detections.
+%
+% Observer 1 here is precise: three short calls, A, B, and C, each drawn
+% tight to the true call. Observer 2 is not: a single wide box from 0 to
+% 50 s, the kind of loose, over-broad detection a low-precision automated
+% detector sometimes produces. That box's INTERVAL genuinely overlaps call
+% A (10-22 s sits inside 0-50 s), but its START time (0 s) sits 10 s away
+% from call A's own start time (10 s) -- farther than the 3 s buffer used
+% throughout this gallery.
+%
+% Clustered links on interval overlap, so it credits observer 2's box to
+% call A: one merged event, plus B and C alone, three events total. It
+% does not care that observer 2's box started ten seconds early, only that
+% the two boxes overlap in time.
+%
+% pointProximity links on start-time distance alone. Ten seconds exceeds
+% the buffer, so it does NOT credit observer 2's box to call A. Observer
+% 2's box opens its own event instead: four events total, one of them
+% looking exactly like a spurious extra detection even though it is
+% genuinely, if imprecisely, call A.
+%
+% Neither answer is simply "correct". Clustered is more forgiving of
+% timing imprecision as long as the boxes truly overlap; pointProximity is
+% stricter about a specific instant and blind to duration and overlap
+% entirely. Which one you want depends on what a "match" should mean for
+% your data -- and this is exactly why pointProximity exists as its own
+% method rather than a variant flag on clustered: the two are answering
+% different questions, the same way clustered and gridded do in example 7.
+
+vn = {'t0','tEnd','fLow','fHigh','snr','trueCall','nCalls'};
+band = [26 28];
+tables = { ...
+    table([10;100;200], [22;112;212], band(1)*ones(3,1), band(2)*ones(3,1), ...
+          10*ones(3,1), [1;2;3], ones(3,1), 'VariableNames', vn), ...  % obs1: precise A, B, C
+    table(0, 50, band(1), band(2), 6, 1, 1, 'VariableNames', vn) };    % obs2: one wide box, truly only A
+
+truth = struct();
+truth.D             = logical([1 1; 1 0; 1 0]);   % call A: both; B, C: obs1 only
+truth.tCentre       = [16; 106; 206];
+truth.nCalls        = 3;
+truth.nObs          = 2;
+truth.detectedCalls = find(any(truth.D, 2));
+truth.nSplits       = 0;
+truth.nLumps        = 0;   % obs2's box is imprecise, not lumped -- it only ever touches call A
+
+chC  = matchbox(tables{:}, 'method','clustered',     'timeBuffer', timeBuffer, 'verbose', false);
+chPP = matchbox(tables{:}, 'method','pointProximity', 'timeBuffer', timeBuffer, 'verbose', false);
+
+fprintf('\nExample 9  point vs interval  [method comparison]\n');
+fprintf('   observer 2''s box: [0, 50] s | call A: [10, 22] s | gap between start times: 10 s | buffer: %g s\n', ...
+    timeBuffer);
+fprintf('   clustered      : %d events (interval overlap credits the wide box to call A)\n', height(chC));
+fprintf('   pointProximity : %d events (start-time distance does not; the wide box opens its own event)\n', ...
+    height(chPP));
+
+plotScenario(tables, chC,  truth, 'Example 9: clustered (wide box credited to call A)');
+plotScenario(tables, chPP, truth, 'Example 9: pointProximity (wide box is its own event)');
+
 fprintf('\n=== gallery complete ===\n');
+
 
 % Helper functions (scenario generation, checking, plotting) live in
 % examples/private/ so this file stays a pure script, which publishes cleanly.

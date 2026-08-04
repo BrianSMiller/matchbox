@@ -6,11 +6,10 @@ function testMatchboxSmoke
 %   are validated rather than silently ignored. Clustered, gridded, and
 %   pointProximity are additionally checked for order independence;
 %   pairwise is not, since order dependence is an inherent, documented
-%   property of that method rather than a bug (see examples/gallery.m
-%   Example 3 for a scenario that demonstrates it directly). A dedicated
-%   fixture also confirms pointProximity and clustered genuinely disagree
-%   where their linkage tests differ (interval overlap vs point distance)
-%   -- see help multiCaptureHistoryPointProximity for why.
+%   property of that method rather than a bug. Likewise, *why* clustered
+%   and pointProximity can disagree on the same data is illustrated in
+%   examples/gallery.m (Example 9), not asserted here -- this file checks
+%   structure and parameter validation, not "makes a good story".
 %   Run with: testMatchboxSmoke
 %
 % For the full illustrated validation ladder see
@@ -101,21 +100,12 @@ pass = check(pass, isequal(pp.detect_observer1(ppOrd)', logical([1 1 1 0])) && .
 pp2 = matchbox(d2, d1, 'method','pointProximity', 'timeBuffer', 3*day, 'verbose', false);
 pass = check(pass, height(pp2) == height(pp), 'pointProximity order independent');
 
-% One point vs two: a fixture where interval overlap and point distance
-% give DIFFERENT answers. d3 is one long call [0,50]*day whose interval
-% entirely swallows d1's call 1 [10,22]*day by overlap (clustered merges
-% them), but whose start point (t0=0) is 10s from d1 call 1's start point
-% (t0=10*day) -- farther than the 3s buffer, so pointProximity keeps them
-% separate. Hand-verified: clustered -> 3 events (d3+call1 merge, call2 and
-% call3 each alone); pointProximity -> 4 events (no merges at all).
-d3 = mk([0]*day, [50]*day);
-clTight = matchbox(d1, d3, 'method','clustered', 'timeBuffer', 3*day, 'verbose', false);
-ppTight = matchbox(d1, d3, 'method','pointProximity', 'timeBuffer', 3*day, 'verbose', false);
-pass = check(pass, height(clTight) == 3 && height(ppTight) == 4, ...
-             'pointProximity vs clustered genuinely differ: point distance misses what interval overlap catches');
-
 % refCol: using 'center' instead of the default 't0' changes which point
-% is compared, and can change the event structure.
+% is compared. A parameter-validation check, not an illustration of *why*
+% clustered and pointProximity can disagree -- that lives in
+% examples/gallery.m (Example 9), the same way pairwise's order dependence
+% lives in Example 3 rather than here.
+d3 = mk([0]*day, [50]*day);
 ppCenter = matchbox(d1, d3, 'method','pointProximity', 'timeBuffer', 3*day, ...
                      'refCol', 'center', 'verbose', false);
 pass = check(pass, height(ppCenter) >= 1, 'pointProximity refCol=''center'' runs and returns events');

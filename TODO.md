@@ -121,10 +121,10 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
 
 - [ ] Capstone example: all pathologies combined. A single scenario with
       jitter, splitting, lumping, and false positives together -- mirroring
-      the conditions of the Casey 2019 real data. Run all three matchers
-      (clustered, gridded, pairwise) and compare. This is the "why we built
-      this toolbox" example. Deferred until after the AWR manuscript is
-      further along.
+      the conditions of the Casey 2019 real data. Run all four matchers
+      (clustered, gridded, pairwise, pointProximity) and compare. This is
+      the "why we built this toolbox" example. Deferred until after the
+      AWR manuscript is further along.
 
 - [x] Add a common scoring suite (`scoreDetections.m`, `scoreDetectionsSweep.m`)
       consuming the matchbox contract directly, to replace the three
@@ -158,6 +158,18 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
            `scoreDetections(ch, groundTruthObserver, k)` calls -- no new
            sweep infrastructure needed, already falls out of
            `scoreDetections`'s caller-chosen-observer design.
+
+- [x] Illustrated gallery.m Example 9 for pointProximity vs clustered: a
+      precise 3-call observer against an imprecise, over-wide detection box
+      that genuinely interval-overlaps one call but whose start point is
+      farther than the buffer from that call's start. Clustered credits the
+      box to the call (3 events); pointProximity does not (4 events, the
+      wide box its own event). Moved here from testMatchboxSmoke.m, which
+      had grown an elaborate "illustration" fixture+comment that belonged
+      in the gallery, not the fast test suite -- same split already
+      established for pairwise's order dependence (Example 3, not tested
+      for instability in testMatchboxSmoke). testMatchboxSmoke.m keeps only
+      structural/parameter-validation checks for pointProximity now.
 
 - [ ] Build the combined-CHT detector comparison (task 2 above) for
       BallenyIslands2015 ATBFL: one `matchbox(...)` call with annotations +
