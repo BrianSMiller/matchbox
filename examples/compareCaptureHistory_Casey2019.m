@@ -1,7 +1,7 @@
 %% compareCaptureHistory_Casey2019.m
-% Functional comparison of the legacy pairwise builder
-% (legacy/multiCaptureHistoryPairwise) against the current matcher
-% (matchbox, method 'clustered') on the Common Ground Casey2019 ABZ dataset.
+% Functional comparison of the pairwise matcher (multiCaptureHistoryPairwise,
+% matchbox method 'pairwise') against the clustered matcher (matchbox,
+% method 'clustered') on the Common Ground Casey2019 ABZ dataset.
 %
 % Five observers: three analysts (a1,a2,a3), Ishmael spectrogram
 % correlation (pg), and Koogu DNN (dnn). We build three combinations and
@@ -9,13 +9,13 @@
 % histograms, and duplicate-key structure.
 %
 % There is no ground truth here. This is a "does it run, and where does it
-% differ" check, not a correctness proof. The legacy path additionally needs
-% doTimespansOverlap and timespanOverlap from the original detection toolbox.
+% differ" check, not a correctness proof. The pairwise path additionally
+% needs doTimespansOverlap and timespanOverlap from the original detection
+% toolbox.
 
 %% ---- paths -----------------------------------------------------------
 here = fileparts(mfilename('fullpath'));
-addpath(fullfile(here, '..'), '-begin');            % matchbox + matchers
-addpath(fullfile(here, '..', 'legacy'), '-begin');  % legacy pairwise builder
+addpath(fullfile(here, '..'), '-begin');  % matchbox + matchers
 
 %% ---- config ----------------------------------------------------------
 siteCode       = 'Casey2019';
@@ -54,7 +54,7 @@ if ~any(strcmpi(pg.Properties.VariableNames, 'snr'))
     writetable(pg, [pgCsv(1:end-4) '_withSNR.csv']);
 end
 
-%% ---- build old and new for each combination --------------------------
+%% ---- build pairwise and clustered for each combination --------------------------
 combos = {
     'analysts123+pg',     {a1, a2, a3, pg}
     'analysts123+dnn',    {a1, a2, a3, dnn}
@@ -62,8 +62,8 @@ combos = {
 };
 nCombo = size(combos, 1);
 
-oldTabs = cell(nCombo, 1);
-newTabs = cell(nCombo, 1);
+pairwiseTabs = cell(nCombo, 1);
+clusteredTabs = cell(nCombo, 1);
 nObs    = zeros(nCombo, 1);
 
 for t = 1:nCombo
@@ -71,25 +71,25 @@ for t = 1:nCombo
     nObs(t)  = numel(obs);
 
     try
-        oldTabs{t} = multiCaptureHistoryPairwise(obs{:});
+        pairwiseTabs{t} = multiCaptureHistoryPairwise(obs{:});
     catch err
-        warning('legacy builder failed on %s: %s', combos{t,1}, err.message);
-        oldTabs{t} = table();
+        warning('pairwise builder failed on %s: %s', combos{t,1}, err.message);
+        pairwiseTabs{t} = table();
     end
 
-    newTabs{t} = matchbox(obs{:}, 'method','clustered', ...
+    clusteredTabs{t} = matchbox(obs{:}, 'method','clustered', ...
                     'timeBuffer', timeBuffer, 'splitRule', splitRule);
 
-    writetable(newTabs{t}, sprintf( ...
+    writetable(clusteredTabs{t}, sprintf( ...
         'MultiObserverCaptureHistory_%s_%s_%s_clustered.csv', ...
         siteCode, classification, combos{t,1}));
 end
 
 %% ---- count comparison ------------------------------------------------
-fprintf('\n%-22s %8s %8s %8s\n', 'Dataset', 'Old', 'New', 'Diff');
+fprintf('\n%-22s %8s %8s %8s\n', 'Dataset', 'Pairwise', 'Clustered', 'Diff');
 fprintf('%s\n', repmat('-', 1, 48));
 for t = 1:nCombo
-    o = oldTabs{t}; n = newTabs{t};
+    o = pairwiseTabs{t}; n = clusteredTabs{t};
     ho = height(o); hn = height(n);
     fprintf('%-22s %8g %8g %8g\n', combos{t,1}, ho, hn, hn-ho);
     for i = 1:nObs(t)
@@ -100,18 +100,18 @@ for t = 1:nCombo
     end
 end
 
-%% ---- observer-mask histograms (old vs new) ---------------------------
+%% ---- observer-mask histograms (pairwise vs clustered) ---------------------------
 figure('units','centimeters','PaperPositionMode','auto','position',[10 10 24 18]);
 tiledlayout(nCombo, 2);
 for t = 1:nCombo
-    o = oldTabs{t}; n = newTabs{t};
+    o = pairwiseTabs{t}; n = clusteredTabs{t};
     detCols = strcat("detect_", append("observer", string(1:nObs(t))));
 
     nexttile
     if all(ismember(detCols, o.Properties.VariableNames))
         histogram(categorical(cellstr(num2str(o{:,detCols}, '%g')))); grid on
     end
-    title(sprintf('%s -- old', combos{t,1}), 'Interpreter','none')
+    title(sprintf('%s -- pairwise', combos{t,1}), 'Interpreter','none')
     xlabel('Observer mask'); ylabel('Count')
 
     nexttile
@@ -121,12 +121,12 @@ for t = 1:nCombo
 end
 
 %% ---- duplicate-key check ---------------------------------------------
-% The clustered builder has one row per event, so duplicate keys must be
-% zero. The old builder's duplicate keys are the lumping/splitting matches
-% (and, historically, garbled-key artefacts).
+% Both builders now guarantee one row per event (the pairwise builder's
+% row-multiplication bug is fixed), so duplicate keys should be zero for
+% both. Kept as a check, not just a demonstration.
 fprintf('\nDuplicate-key structure\n%s\n', repmat('-', 1, 48));
 for t = 1:nCombo
-    for pair = {'old', oldTabs{t}; 'new', newTabs{t}}'
+    for pair = {'pairwise', pairwiseTabs{t}; 'clustered', clusteredTabs{t}}'
         label = pair{1}; tab = pair{2};
         if isempty(tab) || ~ismember('key', tab.Properties.VariableNames)
             fprintf('%-22s %-4s  (no key column)\n', combos{t,1}, label);

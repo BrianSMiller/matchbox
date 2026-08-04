@@ -73,8 +73,16 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       `plotCaptureHistory` (colour by event, show detect flags, no truth
       required) would give a point-check on real capture-history tables. Put
       it on the general path (repo root), not in examples/private.
-- [ ] Decide the fate of the legacy pairwise path: keep for reproducibility
-      or archive once gridded is proven in use.
+- [x] Decide the fate of the legacy pairwise path: promoted and
+      consolidated, not archived -- it's still used sometimes. Folded
+      pairwiseCaptureHistory.m's two-table primitive in as a local
+      subfunction of the new root-level `multiCaptureHistoryPairwise.m`,
+      matched to the clustered/gridded input/output contract and shared
+      options, wired into `matchbox(...,'method','pairwise',...)`, and
+      fixed the row-multiplication bug (duplicate matches to the same
+      existing event now collapse via splitRule, same mechanism
+      clustered/gridded use for splitters). The order-dependence caveat is
+      real and stays documented, not silently declared fixed.
 - [x] Example 3 (order independence): current version only confirms the
       clustered matcher is order-independent, which it does thinly by
       reversing observer order on the example 2 scenario. The goal is also to

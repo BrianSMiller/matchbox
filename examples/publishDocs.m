@@ -10,7 +10,7 @@ examplesDir = fileparts(mfilename('fullpath'));
 repoRoot    = fileparts(examplesDir);
 htmlDir     = fullfile(examplesDir, 'html');
 
-% Ensure the matcher and legacy code are on the path for evaluation.
+% Ensure the matchers are on the path for evaluation.
 addpath(repoRoot, '-begin');
 addpath(examplesDir, '-begin');
 if ~exist(htmlDir, 'dir'), mkdir(htmlDir); end

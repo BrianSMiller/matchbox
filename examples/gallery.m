@@ -153,7 +153,7 @@ res = checkScenario(ch, truth);
 reportRung('2  timing jitter', res);
 plotScenario(tables, ch, truth, 'Example 2: timing jitter');
 
-%% Example 3: Order dependence of the legacy pairwise matcher
+%% Example 3: Order dependence of the pairwise matcher
 % Two calls, call A near 20 s and call B near 40 s, sit twelve seconds apart.
 % Nothing links them except one lumped box: observer 3 drew a single
 % annotation over both, the a2 pathology from Casey 2019. That box overlaps
@@ -164,17 +164,20 @@ plotScenario(tables, ch, truth, 'Example 2: timing jitter');
 % who contributed what, it returns that same one event whichever observer is
 % passed first. It is stable.
 %
-% The legacy pairwise matcher builds a growing aggregate and matches each new
+% The pairwise matcher builds a growing aggregate and matches each new
 % observer against it. Order now decides the answer. Passed 1, 2, 3, the two
 % calls seed separate events and the bridge, arriving last, attaches to the
 % one it overlaps more, leaving two events. Passed 3, 2, 1, the bridge seeds
 % the aggregate first, then A and B both merge onto it, leaving one. Same
-% detections, same boxes, two different capture histories.
+% detections, same boxes, two different capture histories. This is a
+% structural property of matching against a growing aggregate, not a bug --
+% see help multiCaptureHistoryPairwise.
 %
 % Four figures follow. The two clustered timelines are identical. The two
 % pairwise timelines differ, and the difference is visible without reading the
-% prose: forward keeps B separate, reversed swallows it. The legacy path also
-% needs doTimespansOverlap and timespanOverlap from the original toolbox.
+% prose: forward keeps B separate, reversed swallows it. The pairwise path
+% also needs doTimespansOverlap and timespanOverlap from the original
+% toolbox.
 
 vn = {'t0','tEnd','fLow','fHigh','snr','trueCall','nCalls'};
 band = [15 28];

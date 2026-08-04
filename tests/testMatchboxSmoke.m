@@ -1,13 +1,20 @@
 function testMatchboxSmoke
 % testMatchboxSmoke  Fast invariant checks for the matchbox front door.
-%   No external data. Exercises both methods through matchbox(...) and
+%   No external data. Exercises all three methods through matchbox(...) and
 %   confirms the core guarantees: one row per event, unique keys, correct
-%   detect flags, order independence, the default method, and that
-%   method-specific parameters are validated rather than silently ignored.
+%   detect flags, the default method, and that method-specific parameters
+%   are validated rather than silently ignored. Clustered and gridded are
+%   additionally checked for order independence; pairwise is not, since
+%   order dependence is an inherent, documented property of that method
+%   rather than a bug (see examples/gallery.m Example 3 for a scenario that
+%   demonstrates it directly).
 %   Run with: testMatchboxSmoke
 %
 % For the full illustrated validation ladder see
 % examples/gallery.m.
+%
+% NOTE: pairwise needs doTimespansOverlap and timespanOverlap from the
+% original annotatedLibrary/bsmUtils toolboxes on the path.
 
 here = fileparts(mfilename('fullpath'));
 addpath(fullfile(here, '..'));   % put matchbox and the matchers on the path
@@ -50,6 +57,25 @@ pass = check(pass, all(g.detect_observer1(gord)) && ...
 g2 = matchbox(d2, d1, 'method','gridded', 'gridStep', 60*day, 'verbose', false);
 pass = check(pass, height(g2) == height(g), 'gridded order independent');
 
+% --- pairwise, via the front door ----------------------------------------
+% Pairwise matches on time AND frequency, unlike clustered/gridded, so this
+% fixture (same call type, same band, non-ambiguous) still gives one row
+% per event and correct detect flags, even though the matching mechanism
+% differs.
+pw = matchbox(d1, d2, 'method','pairwise', 'timeBuffer', 3*day, 'verbose', false);
+pass = check(pass, height(pw) == numel(unique(pw.key)), 'pairwise unique keys');
+pass = check(pass, height(pw) == 3, 'pairwise three events');
+[~, pwOrd] = sort(pw.t0);
+pass = check(pass, all(pw.detect_observer1(pwOrd)) && ...
+                   isequal(pw.detect_observer2(pwOrd)', logical([1 0 1])), ...
+                   'pairwise detect flags');
+
+% Pairwise is order dependent BY DESIGN (matching against a growing
+% aggregate); unlike clustered/gridded, we do not assert stability under
+% reversed observer order here. A dedicated order-dependence demonstration
+% lives in examples/gallery.m (Example 3), with a scenario built to make
+% the mechanism visible.
+
 % --- parameter validation through the front door ------------------------
 pass = check(pass, threws(@() matchbox(d1, d2, 'method','gridded', 'verbose', false)), ...
              'gridded requires gridStep');
@@ -57,6 +83,8 @@ pass = check(pass, threws(@() matchbox(d1, d2, 'method','nonsense', 'verbose', f
              'unknown method errors');
 pass = check(pass, threws(@() matchbox(d1, d2, 'method','clustered', 'gridStep', 60*day)), ...
              'wrong-method param errors, not silently ignored');
+pass = check(pass, threws(@() matchbox(d1, d2, 'method','pairwise', 'gridStep', 60*day)), ...
+             'pairwise rejects gridded-only param, not silently ignored');
 
 fprintf('\ntestMatchboxSmoke: %s\n', ternary(pass, 'ALL PASS', 'FAILURES ABOVE'));
 end

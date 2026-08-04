@@ -4,6 +4,7 @@ function ch = matchbox(varargin)
 % USAGE:
 %   ch = matchbox(d1, d2, ..., dN, 'method', 'clustered', 'timeBuffer', tb)
 %   ch = matchbox(d1, d2, ..., dN, 'method', 'gridded',   'gridStep', g)
+%   ch = matchbox(d1, d2, ..., dN, 'method', 'pairwise',  'timeBuffer', tb)
 %
 % Each input d1..dN is one observer's detection table with columns
 % t0, tEnd, fLow, fHigh (times in days). Returns one row per event, with
@@ -18,6 +19,13 @@ function ch = matchbox(varargin)
 %                          close-spaced and one-event-per-call breaks down
 %                          (fin 20/40 Hz pulse trains, choruses).
 %                          Tuning parameter: 'gridStep' (required).
+%   'pairwise'             Matches each observer against a growing
+%                          aggregate, on time AND frequency overlap. Order
+%                          dependent (see help multiCaptureHistoryPairwise).
+%                          Use for reproducing pre-2026 results, or where
+%                          frequency-gated matching is specifically wanted;
+%                          prefer clustered/gridded for new work otherwise.
+%                          Tuning parameter: 'timeBuffer' (default 0).
 %
 % SHARED OPTIONAL ARGUMENTS (forwarded to whichever method is chosen)
 %   'splitRule'  'overlap' (default) or 'snr'
@@ -28,7 +36,8 @@ function ch = matchbox(varargin)
 % different method (for example 'gridStep' with 'method','clustered') is an
 % error rather than a silent no-op.
 %
-% See also multiCaptureHistoryClustered, multiCaptureHistoryGridded.
+% See also multiCaptureHistoryClustered, multiCaptureHistoryGridded,
+% multiCaptureHistoryPairwise.
 %
 % B. Miller, AAD, 2026
 
@@ -61,8 +70,10 @@ switch method
         ch = multiCaptureHistoryClustered(tables{:}, fwd{:});
     case "gridded"
         ch = multiCaptureHistoryGridded(tables{:}, fwd{:});
+    case "pairwise"
+        ch = multiCaptureHistoryPairwise(tables{:}, fwd{:});
     otherwise
         error('matchbox:unknownMethod', ...
-              'Unknown method "%s". Use "clustered" or "gridded".', method);
+              'Unknown method "%s". Use "clustered", "gridded", or "pairwise".', method);
 end
 end

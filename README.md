@@ -62,6 +62,7 @@ and the gallery keep the two straight.
 ```matlab
 ch = matchbox(d1, d2, d3, 'method','clustered', 'timeBuffer', 5/86400);
 ch = matchbox(d1, d2, d3, 'method','gridded',   'gridStep', 60/86400);
+ch = matchbox(d1, d2, d3, 'method','pairwise',  'timeBuffer', 5/86400);
 ```
 
 Each input is one observer's detection table with columns `t0`, `tEnd`,
@@ -77,13 +78,22 @@ forwarded to the chosen implementation, which validates them.
 |---|---|---|
 | `clustered` (default) | temporal single-linkage clustering | calls well separated relative to cross-observer timing jitter (Z-calls, D-calls, SRW upcalls in sparse bouts) |
 | `gridded` | fixed reference grid | calls close-spaced, where event-equals-call breaks down (fin 20/40 Hz pulse trains, choruses) |
-| *legacy pairwise* | pairwise outer-join *(deprecated)* | reproduction of pre-2026 results only; order dependent, do not use for new work |
+| `pairwise` | matches each observer against a growing aggregate, gated on time AND frequency overlap | reproducing pre-2026 results, or where frequency-gated matching is specifically wanted; order dependent, prefer clustered/gridded for new work otherwise |
+
+All three share the same input/output contract and the `splitRule`/`verbose`
+options. `pairwise` is a supported, first-class option for the cases it
+still gets used for, not a discouraged one -- but its order dependence is a
+structural property of matching against a growing aggregate, not something
+promoting the interface fixes. See `help multiCaptureHistoryPairwise` for
+the mechanism and what a collapsed-duplicate-match fix does and doesn't
+address.
 
 The implementations live in `multiCaptureHistoryClustered.m`,
-`multiCaptureHistoryGridded.m`, and `legacy/multiCaptureHistoryPairwise.m`.
-They can be called directly, but `matchbox` is the intended interface. Run
-per call type: filter each input to a single classification first, since
-matching uses time and a single frequency band.
+`multiCaptureHistoryGridded.m`, and `multiCaptureHistoryPairwise.m`. They can
+be called directly, but `matchbox` is the intended interface. Run per call
+type: filter each input to a single classification first, since clustered
+and gridded match on time only, and mixed call types make pairwise's
+frequency comparison meaningless too.
 
 ## Layout
 
@@ -91,11 +101,11 @@ matching uses time and a single frequency band.
 matchbox.m                       front door: matchbox(..., 'method', ...)
 multiCaptureHistoryClustered.m   clustered implementation
 multiCaptureHistoryGridded.m     gridded implementation
-legacy/                          deprecated pairwise matcher + primitive
+multiCaptureHistoryPairwise.m    pairwise implementation
 tests/                           fast invariant checks (testMatchboxSmoke)
 examples/
   gallery.m                           illustrated validation ladder (publishable)
-  compareCaptureHistory_Casey2019.m   legacy-vs-current comparison on real data
+  compareCaptureHistory_Casey2019.m   pairwise-vs-clustered comparison on real data
   publishDocs.m                       render the gallery to examples/html/
   html/                               generated HTML
 TODO.md                          open items
@@ -112,9 +122,10 @@ publishDocs                       % render the gallery to html/
 
 ## Dependencies
 
-The clustered matcher and the gallery are self-contained (base MATLAB). The
-legacy pairwise path additionally needs `doTimespansOverlap` and
-`timespanOverlap` from the original annotatedLibrary or bsmUtils toolboxes.
+The clustered and gridded matchers, and the gallery, are self-contained
+(base MATLAB). The pairwise matcher additionally needs `doTimespansOverlap`
+and `timespanOverlap` from the original annotatedLibrary or bsmUtils
+toolboxes.
 
 ## Citation
 
