@@ -3,9 +3,9 @@
 % shows it's real, on a hand-built scenario tuned to make the mechanism
 % visible. compareCaptureHistory_Casey2019.m shows pairwise runs clean
 % (zero duplicate keys) on the Common Ground Casey2019 ABZ dataset. Neither
-% says how much a real analyst/detector combination actually moves under
-% reversed observer order. This does: same combinations, forward and
-% reversed, pairwise only, event counts and per-observer detection counts.
+% says how much the full five-observer combination actually moves under
+% reversed observer order. This does: same dataset, forward and reversed,
+% pairwise only, event counts and per-observer detection counts.
 %
 % Not a pass/fail check -- there is no "correct" order to compare against.
 % This is a magnitude read, deliberately quieter than
@@ -33,36 +33,27 @@ a3  = readtable(ravenA3, 'Delimiter', '\t', 'ReadVariableNames', true);
 pg  = readtable(pgCsv);
 dnn = readtable(dnnCsv, 'Delimiter', ',');
 
-%% ---- combos, same as compareCaptureHistory_Casey2019 ----------------------
-combos = {
-    'analysts123+pg',     {a1, a2, a3, pg}
-    'analysts123+dnn',    {a1, a2, a3, dnn}
-    'analysts123+pg+dnn', {a1, a2, a3, pg, dnn}
-};
-nCombo = size(combos, 1);
-
 %% ---- forward vs reversed, pairwise only -----------------------------------
+obs   = {a1, a2, a3, pg, dnn};
+nObs  = numel(obs);
+ord   = fliplr(1:nObs);
+label = 'analysts123+pg+dnn';
+
+fwd = multiCaptureHistoryPairwise(obs{:},   'timeBuffer', timeBuffer, 'verbose', false);
+rev = multiCaptureHistoryPairwise(obs{ord}, 'timeBuffer', timeBuffer, 'verbose', false);
+
 fprintf('\n%-22s %8s %8s %8s\n', 'Dataset', 'Fwd', 'Rev', 'Diff');
 fprintf('%s\n', repmat('-', 1, 48));
-for t = 1:nCombo
-    obs  = combos{t, 2};
-    nObs = numel(obs);
-    ord  = fliplr(1:nObs);
+hf = height(fwd); hr = height(rev);
+fprintf('%-22s %8g %8g %8g\n', label, hf, hr, hr-hf);
 
-    fwd = multiCaptureHistoryPairwise(obs{:},   'timeBuffer', timeBuffer, 'verbose', false);
-    rev = multiCaptureHistoryPairwise(obs{ord}, 'timeBuffer', timeBuffer, 'verbose', false);
-
-    hf = height(fwd); hr = height(rev);
-    fprintf('%-22s %8g %8g %8g\n', combos{t,1}, hf, hr, hr-hf);
-
-    % Physical observer i sits at slot i in fwd, but at slot (nObs-i+1) in
-    % rev (ord reverses the input order), so compare detect_observer
-    % columns across the corresponding slots, not the same column name.
-    for i = 1:nObs
-        colFwd = sprintf('detect_observer%d', i);
-        colRev = sprintf('detect_observer%d', nObs - i + 1);
-        sf = sum(fwd.(colFwd));
-        sr = sum(rev.(colRev));
-        fprintf('  observer %-11g %8g %8g %8g\n', i, sf, sr, sr-sf);
-    end
+% Physical observer i sits at slot i in fwd, but at slot (nObs-i+1) in
+% rev (ord reverses the input order), so compare detect_observer columns
+% across the corresponding slots, not the same column name.
+for i = 1:nObs
+    colFwd = sprintf('detect_observer%d', i);
+    colRev = sprintf('detect_observer%d', nObs - i + 1);
+    sf = sum(fwd.(colFwd));
+    sr = sum(rev.(colRev));
+    fprintf('  observer %-11g %8g %8g %8g\n', i, sf, sr, sr-sf);
 end

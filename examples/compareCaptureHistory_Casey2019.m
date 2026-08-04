@@ -1,12 +1,10 @@
 %% compareCaptureHistory_Casey2019.m
 % Functional comparison of the pairwise matcher (multiCaptureHistoryPairwise,
 % matchbox method 'pairwise') against the clustered matcher (matchbox,
-% method 'clustered') on the Common Ground Casey2019 ABZ dataset.
-%
-% Five observers: three analysts (a1,a2,a3), Ishmael spectrogram
-% correlation (pg), and Koogu DNN (dnn). We build three combinations and
-% compare event counts, per-observer detection counts, observer-mask
-% histograms, and duplicate-key structure.
+% method 'clustered') on the Common Ground Casey2019 ABZ dataset: three
+% analysts (a1,a2,a3), Ishmael spectrogram correlation (pg), and Koogu DNN
+% (dnn). We compare event counts, per-observer detection counts, observer-
+% mask histograms, and duplicate-key structure.
 %
 % There is no ground truth here. This is a "does it run, and where does it
 % differ" check, not a correctness proof. The pairwise path additionally
@@ -54,90 +52,70 @@ if ~any(strcmpi(pg.Properties.VariableNames, 'snr'))
     writetable(pg, [pgCsv(1:end-4) '_withSNR.csv']);
 end
 
-%% ---- build pairwise and clustered for each combination --------------------------
-combos = {
-    'analysts123+pg',     {a1, a2, a3, pg}
-    'analysts123+dnn',    {a1, a2, a3, dnn}
-    'analysts123+pg+dnn', {a1, a2, a3, pg, dnn}
-};
-nCombo = size(combos, 1);
+%% ---- build pairwise and clustered -------------------------------------
+obs   = {a1, a2, a3, pg, dnn};
+nObs  = numel(obs);
+label = 'analysts123+pg+dnn';
 
-pairwiseTabs = cell(nCombo, 1);
-clusteredTabs = cell(nCombo, 1);
-nObs    = zeros(nCombo, 1);
-
-for t = 1:nCombo
-    obs      = combos{t, 2};
-    nObs(t)  = numel(obs);
-
-    try
-        pairwiseTabs{t} = multiCaptureHistoryPairwise(obs{:});
-    catch err
-        warning('pairwise builder failed on %s: %s', combos{t,1}, err.message);
-        pairwiseTabs{t} = table();
-    end
-
-    clusteredTabs{t} = matchbox(obs{:}, 'method','clustered', ...
-                    'timeBuffer', timeBuffer, 'splitRule', splitRule);
-
-    writetable(clusteredTabs{t}, sprintf( ...
-        'MultiObserverCaptureHistory_%s_%s_%s_clustered.csv', ...
-        siteCode, classification, combos{t,1}));
+try
+    pairwiseTab = multiCaptureHistoryPairwise(obs{:});
+catch err
+    warning('pairwise builder failed: %s', err.message);
+    pairwiseTab = table();
 end
+
+clusteredTab = matchbox(obs{:}, 'method','clustered', ...
+                'timeBuffer', timeBuffer, 'splitRule', splitRule);
+
+writetable(clusteredTab, sprintf( ...
+    'MultiObserverCaptureHistory_%s_%s_%s_clustered.csv', ...
+    siteCode, classification, label));
 
 %% ---- count comparison ------------------------------------------------
+o = pairwiseTab; n = clusteredTab;
 fprintf('\n%-22s %8s %8s %8s\n', 'Dataset', 'Pairwise', 'Clustered', 'Diff');
 fprintf('%s\n', repmat('-', 1, 48));
-for t = 1:nCombo
-    o = pairwiseTabs{t}; n = clusteredTabs{t};
-    ho = height(o); hn = height(n);
-    fprintf('%-22s %8g %8g %8g\n', combos{t,1}, ho, hn, hn-ho);
-    for i = 1:nObs(t)
-        col = sprintf('detect_observer%d', i);
-        so = ternary(ismember(col, o.Properties.VariableNames), @() sum(o.(col)), NaN);
-        sn = sum(n.(col));
-        fprintf('  observer %-11g %8g %8g %8g\n', i, so, sn, sn-so);
-    end
+ho = height(o); hn = height(n);
+fprintf('%-22s %8g %8g %8g\n', label, ho, hn, hn-ho);
+for i = 1:nObs
+    col = sprintf('detect_observer%d', i);
+    so = ternary(ismember(col, o.Properties.VariableNames), @() sum(o.(col)), NaN);
+    sn = sum(n.(col));
+    fprintf('  observer %-11g %8g %8g %8g\n', i, so, sn, sn-so);
 end
 
-%% ---- observer-mask histograms (pairwise vs clustered) ---------------------------
+%% ---- observer-mask histogram (pairwise vs clustered) ------------------
 figure('units','centimeters','PaperPositionMode','auto','position',[10 10 24 18]);
-tiledlayout(nCombo, 2);
-for t = 1:nCombo
-    o = pairwiseTabs{t}; n = clusteredTabs{t};
-    detCols = strcat("detect_", append("observer", string(1:nObs(t))));
+tiledlayout(1, 2);
+detCols = strcat("detect_", append("observer", string(1:nObs)));
 
-    nexttile
-    if all(ismember(detCols, o.Properties.VariableNames))
-        histogram(categorical(cellstr(num2str(o{:,detCols}, '%g')))); grid on
-    end
-    title(sprintf('%s -- pairwise', combos{t,1}), 'Interpreter','none')
-    xlabel('Observer mask'); ylabel('Count')
-
-    nexttile
-    histogram(categorical(cellstr(num2str(n{:,detCols}, '%g')))); grid on
-    title(sprintf('%s -- clustered', combos{t,1}), 'Interpreter','none')
-    xlabel('Observer mask'); ylabel('Count')
+nexttile
+if all(ismember(detCols, o.Properties.VariableNames))
+    histogram(categorical(cellstr(num2str(o{:,detCols}, '%g')))); grid on
 end
+title(sprintf('%s -- pairwise', label), 'Interpreter','none')
+xlabel('Observer mask'); ylabel('Count')
+
+nexttile
+histogram(categorical(cellstr(num2str(n{:,detCols}, '%g')))); grid on
+title(sprintf('%s -- clustered', label), 'Interpreter','none')
+xlabel('Observer mask'); ylabel('Count')
 
 %% ---- duplicate-key check ---------------------------------------------
 % Both builders now guarantee one row per event (the pairwise builder's
 % row-multiplication bug is fixed), so duplicate keys should be zero for
 % both. Kept as a check, not just a demonstration.
 fprintf('\nDuplicate-key structure\n%s\n', repmat('-', 1, 48));
-for t = 1:nCombo
-    for pair = {'pairwise', pairwiseTabs{t}; 'clustered', clusteredTabs{t}}'
-        label = pair{1}; tab = pair{2};
-        if isempty(tab) || ~ismember('key', tab.Properties.VariableNames)
-            fprintf('%-22s %-4s  (no key column)\n', combos{t,1}, label);
-            continue
-        end
-        [~, ~, ic] = unique(tab.key);
-        counts = accumarray(ic, 1);
-        nDup   = sum(counts > 1);
-        fprintf('%-22s %-4s  %d/%d events duplicated\n', ...
-            combos{t,1}, label, nDup, numel(counts));
+for pair = {'pairwise', o; 'clustered', n}'
+    lbl = pair{1}; tab = pair{2};
+    if isempty(tab) || ~ismember('key', tab.Properties.VariableNames)
+        fprintf('%-22s %-4s  (no key column)\n', label, lbl);
+        continue
     end
+    [~, ~, ic] = unique(tab.key);
+    counts = accumarray(ic, 1);
+    nDup   = sum(counts > 1);
+    fprintf('%-22s %-4s  %d/%d events duplicated\n', label, lbl, nDup, numel(counts));
 end
 
 %% ---- local helper ----------------------------------------------------
