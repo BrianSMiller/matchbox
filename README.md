@@ -95,6 +95,34 @@ type: filter each input to a single classification first, since clustered
 and gridded match on time only, and mixed call types make pairwise's
 frequency comparison meaningless too.
 
+## Scoring detector performance
+
+Once you have a capture history, `scoreDetections` turns it into a
+precision/recall confusion matrix, and `scoreDetectionsSweep` does that
+across a threshold sweep.
+
+```matlab
+ch = matchbox(groundTruth, detectorOutput, 'method','clustered', 'timeBuffer', 5/86400);
+pr = scoreDetections(ch, 1, 2);   % which observer is ground truth is your choice, not fixed
+
+pr = scoreDetectionsSweep(groundTruth, detections, thresholds, 'scoreCol','score');
+pr = scoreDetectionsSweep(groundTruth, detectionsByThreshold, thresholds);   % pre-thresholded cell array
+```
+
+`scoreDetections` takes an already-built `ch` (matching is `matchbox`'s job,
+not this function's) and scores any one observer against any other you
+choose as ground truth -- not hardcoded to observer 1. Because matchbox
+guarantees one row per event, this is a plain 2x2 confusion matrix; no
+duplicate-key correction is needed, unlike the pre-2026 scoring code this
+replaces (see `help scoreDetections` for what changed and why).
+
+`scoreDetectionsSweep` handles both ways a threshold sweep shows up in
+practice: a single detection table with a numeric score column, filtered
+per threshold (a DNN's probability, say), or a cell array of one table per
+threshold already built elsewhere (e.g. re-running a query at each
+correlation threshold). It calls `matchbox` and `scoreDetections` once per
+threshold; see `help scoreDetectionsSweep` for the exact contract.
+
 ## Layout
 
 ```
@@ -102,7 +130,9 @@ matchbox.m                       front door: matchbox(..., 'method', ...)
 multiCaptureHistoryClustered.m   clustered implementation
 multiCaptureHistoryGridded.m     gridded implementation
 multiCaptureHistoryPairwise.m    pairwise implementation
-tests/                           fast invariant checks (testMatchboxSmoke)
+scoreDetections.m                precision/recall for one observer vs another, from a ch table
+scoreDetectionsSweep.m           scoreDetections across a threshold sweep
+tests/                           fast invariant checks (testMatchboxSmoke, testScoreDetectionsSmoke)
 examples/
   gallery.m                                 illustrated validation ladder (publishable)
   compareCaptureHistory_Casey2019.m         pairwise-vs-clustered comparison on real data
@@ -118,6 +148,7 @@ TODO.md                          open items
 ```matlab
 addpath(genpath('matchbox'))
 testMatchboxSmoke                 % fast checks, no data needed
+testScoreDetectionsSmoke          % fast checks, no data needed
 cd matchbox/examples
 publishDocs                       % render the gallery to html/
 ```

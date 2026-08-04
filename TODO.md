@@ -126,6 +126,35 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       this toolbox" example. Deferred until after the AWR manuscript is
       further along.
 
+- [x] Add a common scoring suite (`scoreDetections.m`, `scoreDetectionsSweep.m`)
+      consuming the matchbox contract directly, to replace the three
+      independent/reinvented scoring paths in the 2026-AWR-callDensity
+      benchmark scripts (fin20p, Koogu, pamguard_scc). Ground truth is a
+      caller-chosen observer, not hardcoded to observer 1. The duplicate-key
+      correction the old annotatedLibrary scoreDetections.m needed is gone
+      -- matchbox guarantees unique keys now, so that was compensating for
+      a bug that no longer exists.
+
+- [ ] Migrate the three benchmark scripts onto the new scoring suite:
+        - `benchmark_pamguard_scc_BallenyIslands2015_ATBFL.m`: done, fully
+          replaced (its matching/scoring was inline, no opaque helper).
+        - `benchmark_koogu_BallenyIslands2015_ATBFL.m`: drafted, replacing
+          the opaque `sweepKooguThreshold` with `scoreDetectionsSweep`
+          directly against `kooguDet`. Assumes a `score` column exists on
+          `kooguDet` (Koogu's detection probability) -- confirm the actual
+          field name from `loadKooguDetectionsForSite` and fix `scoreCol`
+          in the script if it's named differently.
+        - `benchmark_fin20p_BallenyIslands2015_ATBFL.m`: NOT started.
+          `sweepF20pThresholds` is opaque (source not available when this
+          was written) and its relationship between `result.Tkurt` and
+          per-threshold detection boxes is unconfirmed -- could be a
+          simple score-column filter (same pattern as Koogu) or could
+          require windowing/merging logic specific to fin20pToolkit that
+          `scoreDetectionsSweep`'s cell-array path would need instead.
+          Check `sweepF20pThresholds`/`generateF20pThresholdSweep` before
+          touching this one; guessing wrong here silently changes PR
+          numbers for the fin whale frequency decline JASA letter.
+
 ## Protocol note (not code)
 
 - Add an explicit "one annotation box per call" instruction to the
