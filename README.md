@@ -104,10 +104,12 @@ multiCaptureHistoryGridded.m     gridded implementation
 multiCaptureHistoryPairwise.m    pairwise implementation
 tests/                           fast invariant checks (testMatchboxSmoke)
 examples/
-  gallery.m                           illustrated validation ladder (publishable)
-  compareCaptureHistory_Casey2019.m   pairwise-vs-clustered comparison on real data
-  publishDocs.m                       render the gallery to examples/html/
-  html/                               generated HTML
+  gallery.m                                 illustrated validation ladder (publishable)
+  compareCaptureHistory_Casey2019.m         pairwise-vs-clustered comparison on real data
+  pairwiseOrderDependence_Casey2019.m       real-data magnitude check for pairwise order dependence
+  testPairwiseColumnIntegrity_Casey2019.m   real-data check: detect flags vs column missingness
+  publishDocs.m                             render the gallery to examples/html/
+  html/                                     generated HTML
 TODO.md                          open items
 ```
 
