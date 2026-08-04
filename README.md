@@ -63,6 +63,7 @@ and the gallery keep the two straight.
 ch = matchbox(d1, d2, d3, 'method','clustered', 'timeBuffer', 5/86400);
 ch = matchbox(d1, d2, d3, 'method','gridded',   'gridStep', 60/86400);
 ch = matchbox(d1, d2, d3, 'method','pairwise',  'timeBuffer', 5/86400);
+ch = matchbox(d1, d2, d3, 'method','pointProximity', 'timeBuffer', 5/86400);
 ```
 
 Each input is one observer's detection table with columns `t0`, `tEnd`,
@@ -76,24 +77,45 @@ forwarded to the chosen implementation, which validates them.
 
 | method | approach | use when |
 |---|---|---|
-| `clustered` (default) | temporal single-linkage clustering | calls well separated relative to cross-observer timing jitter (Z-calls, D-calls, SRW upcalls in sparse bouts) |
+| `clustered` (default) | temporal single-linkage clustering on **interval** overlap -- both endpoints of both detections | calls well separated relative to cross-observer timing jitter (Z-calls, D-calls, SRW upcalls in sparse bouts) |
 | `gridded` | fixed reference grid | calls close-spaced, where event-equals-call breaks down (fin 20/40 Hz pulse trains, choruses) |
 | `pairwise` | matches each observer against a growing aggregate, gated on time AND frequency overlap | reproducing pre-2026 results, or where frequency-gated matching is specifically wanted; order dependent, prefer clustered/gridded for new work otherwise |
+| `pointProximity` | single-linkage clustering on a single reference **point** per detection (default `t0`) -- one endpoint, not two, and no frequency test | comparing several detectors on equal, symmetric footing with frequency-blind, point-based matching (Schall & Parcerisas-style), not for reproducing their exact published numbers -- see below |
 
-All three share the same input/output contract and the `splitRule`/`verbose`
-options. `pairwise` is a supported, first-class option for the cases it
-still gets used for, not a discouraged one -- but its order dependence is a
-structural property of matching against a growing aggregate, not something
-promoting the interface fixes. See `help multiCaptureHistoryPairwise` for
-the mechanism and what a collapsed-duplicate-match fix does and doesn't
-address.
+`clustered` and `pointProximity` are the same single-linkage construction
+with different linkage tests: `clustered` links two detections when their
+*intervals* overlap (both `t0` and `tEnd` of each), `pointProximity` links
+them when a single *point* from each (by default `t0`; see `help
+multiCaptureHistoryPointProximity` for `refCol`) is within `timeBuffer`.
+Two points versus one -- that's the whole difference.
+
+`pointProximity` is inspired by, but is NOT a reproduction of, Schall &
+Parcerisas (2022)'s matching criterion. Their algorithm is deliberately
+many-to-many (one detection can satisfy several annotations at once,
+tracked as two independently-defined coverage counts, not resolved into a
+single event set) and asymmetric (annotation start time vs detection
+center time playing different roles). matchbox's one-row-per-event
+contract can't represent that without a collapse rule their algorithm
+doesn't have, so the numbers won't literally match theirs. To reproduce
+their published numbers, use `scoreAgainstAnnotations.m` /
+`matchByTimeProximity.m` (annotatedLibrary) directly, not this method.
+
+All four methods share the same input/output contract and the
+`splitRule`/`verbose` options. `pairwise` is a supported, first-class
+option for the cases it still gets used for, not a discouraged one -- but
+its order dependence is a structural property of matching against a
+growing aggregate, not something promoting the interface fixes. See `help
+multiCaptureHistoryPairwise` for the mechanism and what a collapsed-
+duplicate-match fix does and doesn't address.
 
 The implementations live in `multiCaptureHistoryClustered.m`,
-`multiCaptureHistoryGridded.m`, and `multiCaptureHistoryPairwise.m`. They can
-be called directly, but `matchbox` is the intended interface. Run per call
-type: filter each input to a single classification first, since clustered
-and gridded match on time only, and mixed call types make pairwise's
-frequency comparison meaningless too.
+`multiCaptureHistoryGridded.m`, `multiCaptureHistoryPairwise.m`, and
+`multiCaptureHistoryPointProximity.m`. They can be called directly, but
+`matchbox` is the intended interface. Run per call type: filter each input
+to a single classification first, since clustered and gridded match on
+time only, and mixed call types make pairwise's and pointProximity's
+matching meaningless too (frequency comparison for pairwise; the reference
+point alone carries no frequency information for pointProximity).
 
 ## Scoring detector performance
 
@@ -126,13 +148,14 @@ threshold; see `help scoreDetectionsSweep` for the exact contract.
 ## Layout
 
 ```
-matchbox.m                       front door: matchbox(..., 'method', ...)
-multiCaptureHistoryClustered.m   clustered implementation
-multiCaptureHistoryGridded.m     gridded implementation
-multiCaptureHistoryPairwise.m    pairwise implementation
-scoreDetections.m                precision/recall for one observer vs another, from a ch table
-scoreDetectionsSweep.m           scoreDetections across a threshold sweep
-tests/                           fast invariant checks (testMatchboxSmoke, testScoreDetectionsSmoke)
+matchbox.m                             front door: matchbox(..., 'method', ...)
+multiCaptureHistoryClustered.m         clustered implementation
+multiCaptureHistoryGridded.m           gridded implementation
+multiCaptureHistoryPairwise.m          pairwise implementation
+multiCaptureHistoryPointProximity.m    pointProximity implementation
+scoreDetections.m                      precision/recall for one observer vs another, from a ch table
+scoreDetectionsSweep.m                 scoreDetections across a threshold sweep
+tests/                                 fast invariant checks (testMatchboxSmoke, testScoreDetectionsSmoke)
 examples/
   gallery.m                                 illustrated validation ladder (publishable)
   compareCaptureHistory_Casey2019.m         pairwise-vs-clustered comparison on real data
@@ -155,10 +178,10 @@ publishDocs                       % render the gallery to html/
 
 ## Dependencies
 
-The clustered and gridded matchers, and the gallery, are self-contained
-(base MATLAB). The pairwise matcher additionally needs `doTimespansOverlap`
-and `timespanOverlap` from the original annotatedLibrary or bsmUtils
-toolboxes.
+The clustered, gridded, and pointProximity matchers, and the gallery, are
+self-contained (base MATLAB). The pairwise matcher additionally needs
+`doTimespansOverlap` and `timespanOverlap` from the original
+annotatedLibrary or bsmUtils toolboxes.
 
 ## Citation
 

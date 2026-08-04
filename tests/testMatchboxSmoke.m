@@ -1,20 +1,24 @@
 function testMatchboxSmoke
 % testMatchboxSmoke  Fast invariant checks for the matchbox front door.
-%   No external data. Exercises all three methods through matchbox(...) and
+%   No external data. Exercises all four methods through matchbox(...) and
 %   confirms the core guarantees: one row per event, unique keys, correct
 %   detect flags, the default method, and that method-specific parameters
-%   are validated rather than silently ignored. Clustered and gridded are
-%   additionally checked for order independence; pairwise is not, since
-%   order dependence is an inherent, documented property of that method
-%   rather than a bug (see examples/gallery.m Example 3 for a scenario that
-%   demonstrates it directly).
+%   are validated rather than silently ignored. Clustered, gridded, and
+%   pointProximity are additionally checked for order independence;
+%   pairwise is not, since order dependence is an inherent, documented
+%   property of that method rather than a bug (see examples/gallery.m
+%   Example 3 for a scenario that demonstrates it directly). A dedicated
+%   fixture also confirms pointProximity and clustered genuinely disagree
+%   where their linkage tests differ (interval overlap vs point distance)
+%   -- see help multiCaptureHistoryPointProximity for why.
 %   Run with: testMatchboxSmoke
 %
 % For the full illustrated validation ladder see
 % examples/gallery.m.
 %
 % NOTE: pairwise needs doTimespansOverlap and timespanOverlap from the
-% original annotatedLibrary/bsmUtils toolboxes on the path.
+% original annotatedLibrary/bsmUtils toolboxes on the path. Clustered,
+% gridded, and pointProximity are self-contained (base MATLAB).
 
 here = fileparts(mfilename('fullpath'));
 addpath(fullfile(here, '..'));   % put matchbox and the matchers on the path
@@ -76,6 +80,49 @@ pass = check(pass, all(pw.detect_observer1(pwOrd)) && ...
 % lives in examples/gallery.m (Example 3), with a scenario built to make
 % the mechanism visible.
 
+% --- pointProximity, via the front door ----------------------------------
+% This is NOT the same fixture result as clustered, and that's the point:
+% clustered's running-interval-end mechanism keeps a long detection's
+% cluster open past its own start, so d1's call 3 [200,212] stays linked
+% to BOTH of d2's split fragments (starting at 201 and 209) even though
+% 209-201=8s exceeds the 3s buffer -- the link is via each fragment's own
+% overlap with the still-open interval, not fragment-to-fragment distance.
+% pointProximity has no such extension: it only ever compares consecutive
+% sorted points, so d2's second fragment (t0=209) is genuinely 8s from the
+% nearest other point (201) and opens its own event. Hand-verified (see
+% chat): 4 events, not 3.
+pp = matchbox(d1, d2, 'method','pointProximity', 'timeBuffer', 3*day, 'verbose', false);
+pass = check(pass, height(pp) == numel(unique(pp.key)), 'pointProximity unique keys');
+pass = check(pass, height(pp) == 4, 'pointProximity four events (not three -- see comment)');
+[~, ppOrd] = sort(pp.t0);
+pass = check(pass, isequal(pp.detect_observer1(ppOrd)', logical([1 1 1 0])) && ...
+                   isequal(pp.detect_observer2(ppOrd)', logical([1 0 1 1])), ...
+                   'pointProximity detect flags');
+pp2 = matchbox(d2, d1, 'method','pointProximity', 'timeBuffer', 3*day, 'verbose', false);
+pass = check(pass, height(pp2) == height(pp), 'pointProximity order independent');
+
+% One point vs two: a fixture where interval overlap and point distance
+% give DIFFERENT answers. d3 is one long call [0,50]*day whose interval
+% entirely swallows d1's call 1 [10,22]*day by overlap (clustered merges
+% them), but whose start point (t0=0) is 10s from d1 call 1's start point
+% (t0=10*day) -- farther than the 3s buffer, so pointProximity keeps them
+% separate. Hand-verified: clustered -> 3 events (d3+call1 merge, call2 and
+% call3 each alone); pointProximity -> 4 events (no merges at all).
+d3 = mk([0]*day, [50]*day);
+clTight = matchbox(d1, d3, 'method','clustered', 'timeBuffer', 3*day, 'verbose', false);
+ppTight = matchbox(d1, d3, 'method','pointProximity', 'timeBuffer', 3*day, 'verbose', false);
+pass = check(pass, height(clTight) == 3 && height(ppTight) == 4, ...
+             'pointProximity vs clustered genuinely differ: point distance misses what interval overlap catches');
+
+% refCol: using 'center' instead of the default 't0' changes which point
+% is compared, and can change the event structure.
+ppCenter = matchbox(d1, d3, 'method','pointProximity', 'timeBuffer', 3*day, ...
+                     'refCol', 'center', 'verbose', false);
+pass = check(pass, height(ppCenter) >= 1, 'pointProximity refCol=''center'' runs and returns events');
+pass = check(pass, threws(@() matchbox(d1, d2, 'method','pointProximity', ...
+                                        'refCol', 'notAColumn', 'verbose', false)), ...
+             'pointProximity errors on unknown refCol');
+
 % --- parameter validation through the front door ------------------------
 pass = check(pass, threws(@() matchbox(d1, d2, 'method','gridded', 'verbose', false)), ...
              'gridded requires gridStep');
@@ -85,6 +132,8 @@ pass = check(pass, threws(@() matchbox(d1, d2, 'method','clustered', 'gridStep',
              'wrong-method param errors, not silently ignored');
 pass = check(pass, threws(@() matchbox(d1, d2, 'method','pairwise', 'gridStep', 60*day)), ...
              'pairwise rejects gridded-only param, not silently ignored');
+pass = check(pass, threws(@() matchbox(d1, d2, 'method','pointProximity', 'gridStep', 60*day)), ...
+             'pointProximity rejects gridded-only param, not silently ignored');
 
 fprintf('\ntestMatchboxSmoke: %s\n', ternary(pass, 'ALL PASS', 'FAILURES ABOVE'));
 end

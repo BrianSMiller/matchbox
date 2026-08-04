@@ -135,7 +135,40 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
       -- matchbox guarantees unique keys now, so that was compensating for
       a bug that no longer exists.
 
-- [ ] Migrate the three benchmark scripts onto the new scoring suite:
+- [x] Add `pointProximity` as a fourth matchbox method: single-linkage
+      clustering on one reference point per detection (default `t0`,
+      overridable via `refCol`), no frequency test, same output contract
+      and shared options as the other three. Inspired by, but explicitly
+      NOT a reproduction of, Schall & Parcerisas (2022)'s matching
+      criterion -- their algorithm is deliberately many-to-many
+      (`matchByTimeProximity.m`, annotatedLibrary) and doesn't fit
+      matchbox's one-row-per-event contract without a collapse rule they
+      don't have.
+
+      This splits the fin20p benchmark's two jobs cleanly, which is why it
+      was doing double duty in the first place:
+        1. Reproducing Schall & Parcerisas's published numbers -- stays on
+           `scoreAgainstAnnotations.m`/`matchByTimeProximity.m` directly,
+           untouched, not routed through matchbox.
+        2. Comparing fin20p/Koogu/pamguard_scc/pamguard_energy_sum/
+           annotated-library detectors against each other on equal
+           footing -- uses `pointProximity` (or `clustered`/`gridded`).
+           Combine ALL detectors into one N-observer `ch` and score every
+           detector off the same shared match via repeated
+           `scoreDetections(ch, groundTruthObserver, k)` calls -- no new
+           sweep infrastructure needed, already falls out of
+           `scoreDetections`'s caller-chosen-observer design.
+
+- [ ] Build the combined-CHT detector comparison (task 2 above) for
+      BallenyIslands2015 ATBFL: one `matchbox(...)` call with annotations +
+      fin20p + Koogu + pamguard_scc + pamguard_energy_sum, scored via
+      repeated `scoreDetections` calls off the shared `ch`. Also a natural
+      place to test whether the matching method (clustered vs gridded vs
+      pointProximity) actually changes the detector-comparison answer, by
+      rebuilding the same combined `ch` under each and comparing.
+
+- [ ] Migrate the three benchmark scripts (2026-AWR-callDensity, not this
+      repo) onto the new scoring suite:
         - `benchmark_pamguard_scc_BallenyIslands2015_ATBFL.m`: done, fully
           replaced (its matching/scoring was inline, no opaque helper).
         - `benchmark_koogu_BallenyIslands2015_ATBFL.m`: drafted, replacing
@@ -143,17 +176,14 @@ Ruled out earlier: `snapnow` did not help (inside a function it behaves like
           directly against `kooguDet`. Assumes a `score` column exists on
           `kooguDet` (Koogu's detection probability) -- confirm the actual
           field name from `loadKooguDetectionsForSite` and fix `scoreCol`
-          in the script if it's named differently.
-        - `benchmark_fin20p_BallenyIslands2015_ATBFL.m`: NOT started.
-          `sweepF20pThresholds` is opaque (source not available when this
-          was written) and its relationship between `result.Tkurt` and
-          per-threshold detection boxes is unconfirmed -- could be a
-          simple score-column filter (same pattern as Koogu) or could
-          require windowing/merging logic specific to fin20pToolkit that
-          `scoreDetectionsSweep`'s cell-array path would need instead.
-          Check `sweepF20pThresholds`/`generateF20pThresholdSweep` before
-          touching this one; guessing wrong here silently changes PR
-          numbers for the fin whale frequency decline JASA letter.
+          in the script if it's named differently. Written before the
+          reframe above; if Koogu's role shifts to the combined-CHT
+          comparison (task 2) this draft may need revisiting rather than
+          used as-is.
+        - `benchmark_fin20p_BallenyIslands2015_ATBFL.m`: superseded by the
+          two-task split above. No longer planned as a single
+          matchbox-routed rewrite -- task 1 needs no matchbox changes,
+          task 2 goes through the combined-CHT approach once that's built.
 
 ## Protocol note (not code)
 
